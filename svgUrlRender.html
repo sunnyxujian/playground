@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fabric.js SVG Render Demo</title>
+  <style>
+    canvas {
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <h2>Fabric.js 5.x SVG 渲染示例</h2>
+  <canvas id="canvas" width="800" height="600"></canvas>
+  <script type="module">
+    import { fabric } from "https://cdn.skypack.dev/fabric@5.3.0";
+
+    const canvas = new fabric.Canvas("canvas");
+
+    const svgUrl = "https://dev.w3.org/SVG/tools/svgweb/samples/svg-files/acid.svg";
+
+    fetch(svgUrl)
+      .then((res) => res.text())
+      .then((svgText) => {
+        fabric.loadSVGFromString(svgText, (objects, options) => {
+          const obj = fabric.util.groupSVGElements(objects, options);
+          canvas.add(obj);
+          canvas.centerObject(obj);
+          obj.setCoords();
+          canvas.renderAll();
+        });
+      })
+      .catch((err) => {
+        console.error("加载 SVG 失败：", err);
+      });
+  </script>
+</body>
+</html>

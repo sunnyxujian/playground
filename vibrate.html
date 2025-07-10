@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>兼容振动示例</title>
+</head>
+<body>
+    <button onclick="handleVibration()">点击震动</button>
+
+
+    <script>
+        function isIOS() {
+            return /iPhone|iPad|iPod/i.test(navigator.userAgent);
+        }
+
+        function handleVibration() {
+            if (navigator.vibrate) {
+                navigator.vibrate([200, 100, 200]);
+            } else if (isIOS()) {
+                var sound = document.getElementById('vibrate-sound');
+                sound.play().catch(function(error) {
+                    console.log('音效播放失败:', error);
+                });
+            } else {
+                alert('您的设备不支持震动或替代提示。');
+            }
+        }
+    </script>
+</body>
+</html>

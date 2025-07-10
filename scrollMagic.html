@@ -1,0 +1,37 @@
+<div id="trigger">12321312312312</div>
+<div id="animate">12312312312</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ScrollMagic/2.0.7/ScrollMagic.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/2.1.3/TweenMax.min.js"></script>
+<script>
+  // const controller = new ScrollMagic.Controller();
+
+  // const scene = new ScrollMagic.Scene({
+  //   triggerElement: "#trigger",
+  //   duration: 300,
+  //   offset: 50,
+  // })
+  //   .setTween("#animate", { left: "100%" })
+  //   .addTo(controller);
+
+  scene = new ScrollScene({ triggerElement: "#trigger" });
+
+  // change the position of the trigger
+  $("#trigger").css("top", 500);
+  // immediately let the scene know of this change
+  scene.refresh();
+</script>
+
+<style>
+  #trigger {
+    height: 500px;
+  }
+  #animate {
+    position: absolute;
+    top: 200px;
+    left: 0;
+    width: 100px;
+    height: 100px;
+    background-color: red;
+  }
+</style>

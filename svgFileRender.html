@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fabric.js SVG Upload Demo</title>
+    <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
+
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/jquery.json-viewer/json-viewer/jquery.json-viewer.css"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/jquery.json-viewer/json-viewer/jquery.json-viewer.js"></script>
+    <style>
+      body {
+        margin: 0;
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+      }
+      .container {
+        display: flex;
+        height: 100vh;
+      }
+      .left,
+      .right {
+        padding: 16px;
+        box-sizing: border-box;
+      }
+      .left {
+        width: 650px;
+        display: flex;
+        flex-direction: column;
+      }
+      .right {
+        flex: 1;
+        border-left: 1px solid #ccc;
+        background-color: #f9f9f9;
+        overflow-x: hidden;
+        padding: 30px 0;
+      }
+      canvas {
+        border: 1px solid #ccc;
+      }
+      .controls {
+        margin-bottom: 16px;
+      }
+      #jsonViewer {
+        height: calc(100% - 20px);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="left">
+        <div class="controls">
+          <h2>使用Fabric.js渲染SVG文件并获取JSON数据</h2>
+          <p>
+            <input type="file" id="svgInput" accept="image/svg+xml" /><span
+              id="svgSize"
+            ></span>
+          </p>
+          <p>
+            <button type="button" id="getJsonData">获取JSON数据</button
+            ><span id="jsonSize" style="color: red"></span>
+          </p>
+        </div>
+        <canvas id="canvas" width="600" height="500"></canvas>
+        <h2>数据需要处理的点：</h2>
+        <h3>1.JSON数据转换校验</h3>
+        <p>校验svg中的文案是否是正确的，要排除图像文案，因为图像文案在客户端是无法调起键盘编辑</p>
+        <h3>2.处理svg中的base64图片</h3>
+        <p>svg中的base64图片会使json数据很大，在数据传输时比较慢，而且现在也不支持base64渲染，要上传到oss转成src，然后赋值给元素的src_url属性</p>
+        <h3>3.增加最外层必要数据</h3>
+        <p>增加宽高，以及背景颜色，材质能必须要有的信息，让客户端能正确渲染</p>
+      </div>
+      <div class="right">
+        <div id="jsonViewer"></div>
+      </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/jquery.json-viewer/json-viewer/jquery.json-viewer.js"></script>
+    <script>
+      const canvas = new fabric.Canvas("canvas");
+      $("#svgInput").change(function (event) {
+        const file = event.target.files[0];
+        if (!file || file.type !== "image/svg+xml") {
+          alert("Please upload a valid SVG file.");
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          $("#svgSize").text(
+            "SVG文件大小:" + (file.size / 1024 / 1024).toFixed(2) + "MB"
+          );
+          const svgText = e.target.result;
+          canvas.clear();
+
+          fabric.loadSVGFromString(svgText, (objects, options) => {
+            const obj = fabric.util.groupSVGElements(objects, options);
+            // obj.set({
+            //   left: 0,
+            //   top: 0,
+            // })
+            canvas.add(obj);
+            // canvas.centerObject(obj);
+            obj.setCoords();
+            canvas.requestRenderAll();
+          });
+        };
+        reader.readAsText(file);
+      });
+
+      $("#getJsonData").click(function () {
+        const jsonData = canvas.toJSON();
+        // 计算json数据大小
+        const jsonDataSize = JSON.stringify(jsonData).length;
+        $("#jsonSize").text(
+          "JSON数据大小:" + (jsonDataSize / 1024 / 1024).toFixed(2) + "MB"
+        );
+        $("#jsonViewer").jsonViewer(jsonData, {
+          collapsed: false,
+          rootCollapsable: true,
+        });
+      });
+    </script>
+  </body>
+</html>
