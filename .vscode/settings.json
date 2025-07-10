@@ -1,0 +1,4 @@
+{
+  // 保存时格式化文件
+  "editor.formatOnSave": true,
+}
