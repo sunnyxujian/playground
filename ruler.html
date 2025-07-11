@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HTML5 刻度尺</title>
+    <style></style>
+  </head>
+  <body>
+    <div id="dpi"></div>
+    <div id="ruler"></div>
+    <script>
+      function getLogicalDPI() {
+        const div = document.createElement("div");
+        div.style.width = "1in";
+        div.style.position = "absolute";
+        div.style.top = "-100%";
+        document.body.appendChild(div);
+        const dpi = div.offsetWidth;
+        document.body.removeChild(div);
+        return dpi;
+      }
+
+      const logicalDpi = getLogicalDPI();
+      window.dpi.innerText = logicalDpi;
+      const dpi = logicalDpi * window.devicePixelRatio;
+      const pxPerCm = dpi / 2.54;
+
+      const ruler = document.getElementById("ruler");
+      ruler.style.width = ruler.style.height = pxPerCm + "px";
+      ruler.style.background = "lightgray";
+      ruler.style.border = "1px solid black";
+    </script>
+  </body>
+</html>
