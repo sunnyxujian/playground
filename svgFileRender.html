@@ -42,9 +42,6 @@
       canvas {
         border: 1px solid #ccc;
       }
-      .controls {
-        margin-bottom: 16px;
-      }
       #jsonViewer {
         height: calc(100% - 20px);
       }
@@ -56,21 +53,31 @@
         <div class="controls">
           <h2>使用Fabric.js渲染SVG文件并获取JSON数据</h2>
           <p>
-            <input type="file" id="svgInput" accept="image/svg+xml" /><span
-              id="svgSize"
-            ></span>
+            <input type="file" id="svgInput" accept="image/svg+xml" />
+            <span id="svgSize"></span>
           </p>
           <p>
-            <button type="button" id="getJsonData">获取JSON数据</button
-            ><span id="jsonSize" style="color: red"></span>
+            <button type="button" id="getJsonData">获取JSON数据</button>
+            <button type="button" id="getActiveElementJsonData">
+              获取当前元素JSON数据
+            </button>
+            <span id="jsonSize" style="color: red"></span>
           </p>
+        </div>
+        <div style="display: flex; gap: 20px; margin-bottom: 20px">
+          <button id="resetBtn">重置画布</button>
+          <button id="selectAllBtn">全选元素</button>
         </div>
         <canvas id="canvas" width="600" height="500"></canvas>
         <h2>数据需要处理的点：</h2>
         <h3>1.JSON数据转换校验</h3>
-        <p>校验svg中的文案是否是正确的，要排除图像文案，因为图像文案在客户端是无法调起键盘编辑</p>
+        <p>
+          校验svg中的文案是否是正确的，要排除图像文案，因为图像文案在客户端是无法调起键盘编辑
+        </p>
         <h3>2.处理svg中的base64图片</h3>
-        <p>svg中的base64图片会使json数据很大，在数据传输时比较慢，而且现在也不支持base64渲染，要上传到oss转成src，然后赋值给元素的src_url属性</p>
+        <p>
+          svg中的base64图片会使json数据很大，在数据传输时比较慢，而且现在也不支持base64渲染，要上传到oss转成src，然后赋值给元素的src_url属性
+        </p>
         <h3>3.增加最外层必要数据</h3>
         <p>增加宽高，以及背景颜色，材质能必须要有的信息，让客户端能正确渲染</p>
       </div>
@@ -81,13 +88,18 @@
     <script src="https://cdn.jsdelivr.net/npm/jquery.json-viewer/json-viewer/jquery.json-viewer.js"></script>
     <script>
       const canvas = new fabric.Canvas("canvas");
+
+      window.canvas = canvas;
+
+      let initialSVGState = null; // 用于保存第一次加载后的 SVG JSON 状态
+      let isRestoring = false; // 标志：当前是否处于撤销/重做中
+
       $("#svgInput").change(function (event) {
         const file = event.target.files[0];
         if (!file || file.type !== "image/svg+xml") {
           alert("Please upload a valid SVG file.");
           return;
         }
-
         const reader = new FileReader();
         reader.onload = function (e) {
           $("#svgSize").text(
@@ -97,19 +109,179 @@
           canvas.clear();
 
           fabric.loadSVGFromString(svgText, (objects, options) => {
-            const obj = fabric.util.groupSVGElements(objects, options);
-            // obj.set({
-            //   left: 0,
-            //   top: 0,
-            // })
-            canvas.add(obj);
-            // canvas.centerObject(obj);
-            obj.setCoords();
+            canvas.clear();
+
+            // 遍历每个对象，设置其为可编辑
+            objects.forEach((obj) => {
+              obj.set({
+                selectable: true,
+                hasControls: true,
+                lockScalingFlip: false,
+                lockMovementX: false,
+                lockMovementY: false,
+                lockScalingX: false,
+                lockScalingY: false,
+                lockRotation: false,
+                editable: true, // 虽然 Fabric 本身不使用 editable 属性，但如果你扩展编辑器可能用得到
+              });
+
+              // 对于文本对象，确保启用编辑
+              if (obj.type === "text" || obj.type === "i-text") {
+                const itext = new fabric.IText(obj.text, obj.toObject());
+                canvas.add(itext);
+              } else {
+                canvas.add(obj);
+              }
+            });
             canvas.requestRenderAll();
+            saveState();
+            // 保存初始 SVG 状态用于重置
+            initialSVGState = JSON.stringify(canvas.toJSON());
           });
         };
         reader.readAsText(file);
       });
+
+      // 监听操作行为后自动保存快照（移动、缩放、旋转、修改文字等）
+      canvas.on("object:modified", () => {
+        saveState();
+        redoStack.length = 0; // 修改后清除 redo 栈
+      });
+
+      // canvas.on("object:removed", () => {
+      //   saveState();
+      //   redoStack.length = 0;
+      // });
+
+      const undoStack = [];
+      const redoStack = [];
+      // 删除选中对象（监听键盘 Delete 或 Backspace）
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Delete" || e.key === "Backspace") {
+          const activeObject = canvas.getActiveObject();
+          if (activeObject) {
+            // 删除组或单个对象
+            if (activeObject.type === "activeSelection") {
+              activeObject.forEachObject((obj) => canvas.remove(obj));
+            } else {
+              canvas.remove(activeObject);
+            }
+            canvas.discardActiveObject();
+            canvas.requestRenderAll();
+            // ✅ 明确在用户操作“完成”后调用 saveState，只保存有意义的一次变更
+            saveState();
+          }
+        }
+        // 撤销 Ctrl+Z
+        if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+          console.log("🚀 ~ undoStack=>", undoStack);
+          if (undoStack.length > 1) {
+            const currentState = undoStack.pop();
+            console.log("🚀 ~ undoStack=>", undoStack);
+            redoStack.push(currentState);
+            const prevState = undoStack[undoStack.length - 1];
+            restoreState(prevState);
+          }
+        }
+
+        // 重做 Ctrl+Y 或 Ctrl+Shift+Z
+        if (
+          (e.ctrlKey || e.metaKey) &&
+          (e.key === "y" || (e.shiftKey && e.key === "Z"))
+        ) {
+          if (redoStack.length > 0) {
+            const nextState = redoStack.pop();
+            undoStack.push(nextState);
+            restoreState(nextState);
+          }
+        }
+      });
+      // 记录当前画布状态
+      function saveState() {
+        if (isRestoring) return; // 避免在撤销/重做中保存状态
+        const json = JSON.stringify(canvas.toJSON());
+
+        // 避免重复状态（两次状态完全一样时不入栈）
+        if (
+          undoStack.length === 0 ||
+          undoStack[undoStack.length - 1] !== json
+        ) {
+          if (undoStack.length >= 50) undoStack.shift();
+          undoStack.push(json);
+          redoStack.length = 0; // 一旦用户新操作，清空 redo 栈
+        }
+      }
+
+      // 恢复历史状态
+      function restoreState(json) {
+        isRestoring = true;
+        canvas.loadFromJSON(json, () => {
+          canvas.renderAll();
+          isRestoring = false;
+        });
+      }
+
+      // 重置按钮：恢复初始 SVG 状态
+      document.getElementById("resetBtn").addEventListener("click", () => {
+        console.log("🚀 ~ initialSVGState=>", initialSVGState);
+        if (initialSVGState) {
+          canvas.loadFromJSON(initialSVGState, () => {
+            canvas.renderAll();
+            saveState();
+          });
+        } else {
+          alert("尚未加载任何SVG文件！");
+        }
+      });
+
+      // 全选按钮：选中所有元素
+      document.getElementById("selectAllBtn").addEventListener("click", () => {
+        const allObjects = canvas.getObjects();
+        if (allObjects.length > 0) {
+          const selection = new fabric.ActiveSelection(allObjects, {
+            canvas: canvas,
+          });
+          canvas.setActiveObject(selection);
+          canvas.requestRenderAll();
+        }
+      });
+
+      document
+        .getElementById("getActiveElementJsonData")
+        .addEventListener("click", () => {
+          const activeObject = canvas.getActiveObject();
+
+          if (!activeObject) {
+            alert("当前没有选中任何元素！");
+            return;
+          }
+
+          let jsonData;
+
+          if (activeObject.type === "activeSelection") {
+            // 多选时：转换成单个对象数组
+            jsonData = activeObject._objects.map((obj) => obj.toJSON());
+          } else {
+            // 单个元素
+            jsonData = activeObject.toJSON();
+          }
+
+          console.log("当前元素 JSON 数据：", jsonData);
+
+          // 如果你有一个查看器容器，例如 id="jsonViewer"
+          $("#jsonViewer").jsonViewer(jsonData, {
+            collapsed: false,
+            rootCollapsable: true,
+          });
+
+          // 也可以显示 JSON 数据大小
+          const jsonDataSize = JSON.stringify(jsonData).length;
+          $("#jsonSize").text(
+            "当前元素 JSON 大小:" +
+              (jsonDataSize / 1024 / 1024).toFixed(2) +
+              "MB"
+          );
+        });
 
       $("#getJsonData").click(function () {
         const jsonData = canvas.toJSON();
