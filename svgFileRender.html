@@ -78,13 +78,15 @@
           <button id="resetBtn">重置画布</button>
           <button id="selectAllBtn">全选元素</button>
         </div>
-        <div style="margin-bottom: 20px">
-          删除：<kbd>backspace</kbd>/<kbd>del</kbd>
+        <div style="margin-bottom: 10px">
+          删除：<kbd>Backspace</kbd>/<kbd>Del</kbd>
         </div>
-        <div style="margin-bottom: 20px">撤销：<kbd>ctrl+z</kbd></div>
-        <div style="margin-bottom: 20px">
-          重做：<kbd>ctrl+y</kbd>/<kbd>ctrl+shift+z</kbd>
+        <div style="margin-bottom: 10px">撤销：<kbd>ctrl+Z</kbd></div>
+        <div style="margin-bottom: 10px">
+          重做：<kbd>Ctrl+Y</kbd>/<kbd>Ctrl+Shift+Z</kbd>
         </div>
+        <div style="margin-bottom: 20px">全选元素：<kbd>Ctrl+A</kbd></div>
+
         <canvas id="canvas" width="600" height="500"></canvas>
         <h2>数据需要处理的点：</h2>
         <h3>1.JSON数据转换校验</h3>
@@ -210,6 +212,19 @@
             const nextState = redoStack.pop();
             undoStack.push(nextState);
             restoreState(nextState);
+          }
+        }
+
+        // 全选 Ctrl+A
+        if ((e.ctrlKey || e.metaKey) && e.key === "a") {
+          e.preventDefault();
+          const allObjects = canvas.getObjects();
+          if (allObjects.length > 0) {
+            const selection = new fabric.ActiveSelection(allObjects, {
+              canvas: canvas,
+            });
+            canvas.setActiveObject(selection);
+            canvas.requestRenderAll();
           }
         }
       });
