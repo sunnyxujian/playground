@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>SVG.js 无限循环打字退格动画</title>
+    <script src="https://cdn.jsdelivr.net/npm/@svgdotjs/svg.js@3.1/dist/svg.min.js"></script>
+    <style>
+      body {
+        font-family: sans-serif;
+        padding: 20px;
+      }
+      #drawing {
+        border: 1px solid #ccc;
+      }
+      .cursor {
+        fill: black;
+        animation: blink 1s steps(1) infinite;
+      }
+      @keyframes blink {
+        0%,
+        50% {
+          opacity: 1;
+        }
+        50.01%,
+        100% {
+          opacity: 0;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <button id="export">导出</button>
+    <div id="drawing"></div>
+
+    <script>
+      const draw = SVG().addTo("#drawing").size(300, 80);
+      const fontSize = 32;
+      const startX = 10;
+      const startY = 50;
+
+      let textElem = draw
+        .text("")
+        .font({ size: fontSize, family: "sans-serif" })
+        .move(startX, startY - fontSize);
+      let cursor = draw.rect(2, fontSize).fill("black").addClass("cursor");
+
+      const deleteText = "商品标价签";
+      const inputText = "你的店名";
+
+      function updateCursor() {
+        const bbox = textElem.bbox();
+        cursor.move(bbox.x2 + 2, startY - 2 * fontSize);
+      }
+
+      async function deleteAnim() {
+        for (let i = deleteText.length; i >= 0; i--) {
+          textElem.text(deleteText.slice(0, i));
+          updateCursor();
+          await new Promise((r) => setTimeout(r, 200));
+        }
+      }
+
+      async function inputAnim() {
+        for (let i = 1; i <= inputText.length; i++) {
+          textElem.text(inputText.slice(0, i));
+          updateCursor();
+          await new Promise((r) => setTimeout(r, 200));
+        }
+      }
+
+      async function pause(ms) {
+        return new Promise((r) => setTimeout(r, ms));
+      }
+
+      async function runLoop() {
+        while (true) {
+          await deleteAnim();
+          await pause(1200);
+          await inputAnim();
+          await pause(800);
+        }
+      }
+
+      textElem.text(deleteText);
+      updateCursor();
+      runLoop();
+
+      document.querySelector("#export").addEventListener("click", () => {
+        const svg = draw.svg();
+        console.log("🚀 ~ svg=>", svg);
+        const blob = new Blob([svg], { type: "image/svg+xml" });
+        const url = URL.createObjectURL(blob);
+        window.open(url);
+      });
+    </script>
+  </body>
+</html>

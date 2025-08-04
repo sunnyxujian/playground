@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <script src="https://cdn.jsdelivr.net/npm/fabric@5.2.1/dist/fabric.min.js"></script>
+    <style>
+      canvas {
+        border: 1px solid #ccc;
+      }
+      #info {
+        font-size: 20px;
+        height: 400px;
+        overflow-y: scroll;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c" width="800" height="800"></canvas>
+    <div id="info"></div>
+  </body>
+  <script>
+    var canvas = new fabric.Canvas("c");
+    fabric.Image.fromURL(
+      "https://oss-shop.niimbot.com/shop/img/20231117/yLbuhqV2ntY9jQAKRijU.png",
+      function (img) {
+        // console.log("🚀 ~ img=>", img);
+        const scale = Math.min(700 / img.height, 700 / img.width);
+        console.log("🚀 ~ scale=>", scale);
+        img.scale(0.5).set({
+          left: 100,
+          top: 100,
+        });
+        canvas.add(img).setActiveObject(img);
+      }
+    );
+
+    var info = document.getElementById("info");
+
+    canvas.on({
+      "touch:gesture": function () {
+        var text = document.createTextNode(" Gesture ");
+        info.insertBefore(text, info.firstChild);
+      },
+      "touch:drag": function () {
+        var text = document.createTextNode(" Dragging ");
+        info.insertBefore(text, info.firstChild);
+      },
+      "touch:orientation": function () {
+        var text = document.createTextNode(" Orientation ");
+        info.insertBefore(text, info.firstChild);
+      },
+      "touch:shake": function () {
+        var text = document.createTextNode(" Shaking ");
+        info.insertBefore(text, info.firstChild);
+      },
+      "touch:longpress": function () {
+        var text = document.createTextNode(" Longpress ");
+        info.insertBefore(text, info.firstChild);
+      },
+    });
+  </script>
+</html>

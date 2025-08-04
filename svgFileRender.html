@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fabric.js SVG Upload Demo</title>
-    <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fabric@5.2.1/dist/fabric.min.js"></script>
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <link
@@ -18,6 +18,16 @@
         font-family: Arial, sans-serif;
         font-size: 14px;
       }
+      h2,
+      h3,
+      h4,
+      h5,
+      h6 {
+        margin: 0;
+      }
+      p {
+        margin: 0;
+      }
       .container {
         display: flex;
         height: 100vh;
@@ -29,9 +39,11 @@
         overflow-x: hidden;
       }
       .left {
-        width: 650px;
+        width: 900px;
         display: flex;
         flex-direction: column;
+        gap: 20px;
+        padding: 20px 100px;
       }
       .right {
         flex: 1;
@@ -53,7 +65,12 @@
         padding: 4px 8px;
         border-radius: 4px;
         border: 1px solid #ccc;
-        margin: 0 5px;
+        margin: 0 2px;
+      }
+      .shortcut {
+        display: flex;
+        /* flex-direction: column; */
+        gap: 10px;
       }
     </style>
   </head>
@@ -61,44 +78,59 @@
     <div class="container">
       <div class="left">
         <div class="controls">
-          <h2>使用Fabric.js渲染SVG文件并获取JSON数据</h2>
+          <h1 align="center">SVG设计稿编辑器(转JSON)</h1>
           <p>
             <input type="file" id="svgInput" accept="image/svg+xml" />
             <span id="svgSize"></span>
           </p>
-          <p>
-            <button type="button" id="getJsonData">获取JSON数据</button>
-            <button type="button" id="getActiveElementJsonData">
-              获取当前元素JSON数据
-            </button>
-            <span id="jsonSize" style="color: red"></span>
-          </p>
         </div>
-        <div style="display: flex; gap: 20px; margin-bottom: 20px">
+        <div style="display: flex; gap: 20px">
           <button id="resetBtn">重置画布</button>
           <button id="selectAllBtn">全选元素</button>
+          <button type="button" id="getJsonData">获取JSON数据</button>
+          <button type="button" id="getActiveElementJsonData">
+            获取当前元素JSON数据
+          </button>
+          <span id="jsonSize" style="color: red"></span>
         </div>
-        <div style="margin-bottom: 10px">
-          删除：<kbd>Backspace</kbd>/<kbd>Del</kbd>
+        <h4>快捷键说明：</h4>
+        <div class="shortcut">
+          <div>删除：<kbd>Backspace</kbd>/<kbd>Del</kbd></div>
+          <div>撤销：<kbd>ctrl+Z</kbd></div>
+          <div>重做：<kbd>Ctrl+Y</kbd>/<kbd>Ctrl+Shift+Z</kbd></div>
+          <div>全选元素：<kbd>Ctrl+A</kbd></div>
         </div>
-        <div style="margin-bottom: 10px">撤销：<kbd>ctrl+Z</kbd></div>
-        <div style="margin-bottom: 10px">
-          重做：<kbd>Ctrl+Y</kbd>/<kbd>Ctrl+Shift+Z</kbd>
+        <div>
+          标签尺寸:
+          <input
+            type="number"
+            id="viewBoxPadding"
+            placeholder="宽"
+            value="500"
+          />
+          x
+          <input
+            type="number"
+            id="viewBoxPadding2"
+            placeholder="高"
+            value="300"
+          />mm
         </div>
-        <div style="margin-bottom: 20px">全选元素：<kbd>Ctrl+A</kbd></div>
+        <canvas id="canvas" width="500" height="300"></canvas>
 
-        <canvas id="canvas" width="600" height="500"></canvas>
-        <h2>数据需要处理的点：</h2>
+        <h2>数据需要处理的步骤：</h2>
         <h3>1.JSON数据转换校验</h3>
-        <p>
+        <div>
           校验svg中的文案是否是正确的，要排除图像文案，因为图像文案在客户端是无法调起键盘编辑
-        </p>
+        </div>
         <h3>2.处理svg中的base64图片</h3>
-        <p>
+        <div>
           svg中的base64图片会使json数据很大，在数据传输时比较慢，而且现在也不支持base64渲染，要上传到oss转成src，然后赋值给元素的src_url属性
-        </p>
+        </div>
         <h3>3.增加最外层必要数据</h3>
-        <p>增加宽高，以及背景颜色，材质能必须要有的信息，让客户端能正确渲染</p>
+        <div>
+          增加宽高，以及背景颜色，材质能必须要有的信息，让客户端能正确渲染
+        </div>
       </div>
       <div class="right">
         <div id="jsonViewer"></div>
@@ -122,7 +154,7 @@
         const reader = new FileReader();
         reader.onload = function (e) {
           $("#svgSize").text(
-            "SVG文件大小:" + (file.size / 1024 / 1024).toFixed(2) + "MB"
+            "SVG文件大小:" + (file.size / 1024).toFixed(2) + "KB"
           );
           const svgText = e.target.result;
           canvas.clear();
@@ -176,6 +208,7 @@
       const redoStack = [];
       // 删除选中对象（监听键盘 Delete 或 Backspace）
       document.addEventListener("keydown", function (e) {
+        // 删除选中对象（监听键盘 Delete 或 Backspace）
         if (e.key === "Delete" || e.key === "Backspace") {
           const activeObject = canvas.getActiveObject();
           if (activeObject) {
@@ -327,6 +360,16 @@
           rootCollapsable: true,
         });
       });
+
+      // // 点击页面其他地方时关闭菜单
+      // document.addEventListener("click", function (e) {
+      //   // 如果点击的目标不是按钮，也不是菜单本身（或菜单的子元素）
+      //   if (e.target.contains($("canvas")[0])) {
+      //     // 取消全部选中
+      //     canvas.discardActiveObject();
+      //     canvas.requestRenderAll();
+      //   }
+      // });
     </script>
   </body>
 </html>
