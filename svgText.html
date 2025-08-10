@@ -3,28 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <title>SVG.js 无限循环打字退格动画</title>
-    <script src="https://cdn.jsdelivr.net/npm/@svgdotjs/svg.js@3.1/dist/svg.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fabric@5.2.1/dist/fabric.min.js"></script>
     <style>
-      body {
-        font-family: sans-serif;
-        padding: 20px;
-      }
-      #drawing {
+      canvas {
         border: 1px solid #ccc;
-      }
-      .cursor {
-        fill: black;
-        animation: blink 1s steps(1) infinite;
-      }
-      @keyframes blink {
-        0%,
-        50% {
-          opacity: 1;
-        }
-        50.01%,
-        100% {
-          opacity: 0;
-        }
       }
     </style>
   </head>
@@ -32,66 +15,138 @@
     <button id="export">导出</button>
     <div id="drawing"></div>
 
+    <canvas id="c" width="600" height="600"></canvas>
+    <button onclick="startRecordingTyping()">导出打字动画 GIF</button>
+
     <script>
-      const draw = SVG().addTo("#drawing").size(300, 80);
-      const fontSize = 32;
-      const startX = 10;
-      const startY = 50;
-
-      let textElem = draw
-        .text("")
-        .font({ size: fontSize, family: "sans-serif" })
-        .move(startX, startY - fontSize);
-      let cursor = draw.rect(2, fontSize).fill("black").addClass("cursor");
-
-      const deleteText = "商品标价签";
-      const inputText = "你的店名";
-
-      function updateCursor() {
-        const bbox = textElem.bbox();
-        cursor.move(bbox.x2 + 2, startY - 2 * fontSize);
-      }
-
-      async function deleteAnim() {
-        for (let i = deleteText.length; i >= 0; i--) {
-          textElem.text(deleteText.slice(0, i));
-          updateCursor();
-          await new Promise((r) => setTimeout(r, 200));
-        }
-      }
-
-      async function inputAnim() {
-        for (let i = 1; i <= inputText.length; i++) {
-          textElem.text(inputText.slice(0, i));
-          updateCursor();
-          await new Promise((r) => setTimeout(r, 200));
-        }
-      }
-
-      async function pause(ms) {
-        return new Promise((r) => setTimeout(r, ms));
-      }
-
-      async function runLoop() {
-        while (true) {
-          await deleteAnim();
-          await pause(1200);
-          await inputAnim();
-          await pause(800);
-        }
-      }
-
-      textElem.text(deleteText);
-      updateCursor();
-      runLoop();
-
-      document.querySelector("#export").addEventListener("click", () => {
-        const svg = draw.svg();
-        console.log("🚀 ~ svg=>", svg);
-        const blob = new Blob([svg], { type: "image/svg+xml" });
-        const url = URL.createObjectURL(blob);
-        window.open(url);
+      const canvas = new fabric.Canvas("c", {
+        backgroundColor: "#fff",
       });
+
+      // 创建文字对象
+      const textObj = new fabric.Text("", {
+        left: 50,
+        top: 40,
+        fontSize: 32,
+        fill: "#000",
+      });
+      canvas.add(textObj);
+
+      // 打字动画函数（略有修改以添加 hook 回调）
+      function addTypingAnimation(
+        textObj,
+        { toText, speed = 150, pause = 1000, onFrame, onComplete }
+      ) {
+        const fromText = textObj.text || "";
+        textObj.originalText = fromText;
+        let phase = "show_full";
+        let charIndex = 0;
+        let displayText = "";
+        let cursorVisible = true;
+        let timer = null;
+        let blinkTimer = null;
+        let isCompleted = false;
+
+        // 启动光标闪烁
+        blinkTimer = setInterval(() => {
+          cursorVisible = !cursorVisible;
+          renderText();
+        }, 500);
+
+        function renderText() {
+          textObj.text = displayText + (cursorVisible ? "|" : "");
+          textObj.dirty = true;
+          textObj.canvas && textObj.canvas.requestRenderAll();
+          if (onFrame) onFrame(); // 👈 每帧调用，通知 gif.js 捕捉
+        }
+
+        function loop() {
+          if (phase === "show_full") {
+            displayText = fromText;
+            charIndex = fromText.length;
+            renderText();
+            timer = setTimeout(() => {
+              phase = "deleting";
+              loop();
+            }, pause);
+          } else if (phase === "deleting") {
+            if (charIndex > 0) {
+              charIndex--;
+              displayText = fromText.slice(0, charIndex);
+              renderText();
+              timer = setTimeout(loop, speed);
+            } else {
+              phase = "typing";
+              charIndex = 0;
+              timer = setTimeout(loop, speed);
+            }
+          } else if (phase === "typing") {
+            if (charIndex < toText.length) {
+              charIndex++;
+              displayText = toText.slice(0, charIndex);
+              renderText();
+              timer = setTimeout(loop, speed);
+            } else {
+              if (!isCompleted) {
+                isCompleted = true;
+                clearInterval(blinkTimer);
+                clearTimeout(timer);
+                if (onComplete) onComplete(); // 👈 动画完成通知
+              }
+            }
+          }
+        }
+
+        textObj.stopAnimate = () => {
+          clearInterval(blinkTimer);
+          clearTimeout(timer);
+          textObj.text = textObj.originalText;
+          textObj.dirty = true;
+          textObj.animatText = "";
+          textObj.canvas && textObj.canvas.requestRenderAll();
+        };
+
+        textObj.animatText = toText;
+        loop();
+      }
+
+      // ⏺️ 导出动画
+      async function startRecordingTyping() {
+        const gif = new GIF({
+          workers: 2,
+          quality: 10,
+          width: canvas.getWidth(),
+          height: canvas.getHeight(),
+          workerScript:
+            "https://cdn.jsdelivr.net/npm/gif.js.optimized/dist/gif.worker.js",
+        });
+
+        // 每帧采集 canvas 图像
+        const onFrame = () => {
+          gif.addFrame(canvas.getElement(), { delay: 150 }); // 每帧150ms
+        };
+
+        // 动画完成时导出
+        const onComplete = () => {
+          gif.on("finished", function (blob) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "typing.gif";
+            a.click();
+            URL.revokeObjectURL(url);
+          });
+          gif.render();
+        };
+
+        addTypingAnimation(textObj, {
+          toText: "你好，世界！",
+          speed: 150,
+          pause: 1000,
+          onFrame,
+          onComplete,
+        });
+      }
     </script>
   </body>
 </html>

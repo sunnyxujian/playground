@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Document</title>
-    <script src="https://cdn.jsdelivr.net/npm/fabric@5.2.1/dist/fabric.min.js"></script>
+    <script src="./fabric.min.js"></script>
     <style>
       canvas {
         border: 1px solid #ccc;
@@ -17,7 +17,7 @@
     </style>
   </head>
   <body>
-    <canvas id="c" width="800" height="800"></canvas>
+    <canvas id="c" width="375" height="375"></canvas>
     <div id="info"></div>
   </body>
   <script>
@@ -39,8 +39,9 @@
     var info = document.getElementById("info");
 
     canvas.on({
-      "touch:gesture": function () {
-        var text = document.createTextNode(" Gesture ");
+      "touch:gesture": function (...args) {
+        console.log('🚀 ~ args=>', args)
+        // var text = document.createTextNode(" Gesture ");
         info.insertBefore(text, info.firstChild);
       },
       "touch:drag": function () {
