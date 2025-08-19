@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>13px 小环形进度条</title>
+  <style>
+    .ring {
+      width: 13px;
+      height: 13px;
+      display: inline-block;
+    }
+    .ring svg {
+      transform: rotate(-90deg); /* 让进度从正上方开始 */
+    }
+  </style>
+</head>
+<body>
+  <!-- 小环形进度条 -->
+  <div class="ring">
+    <svg width="13" height="13" viewBox="0 0 13 13">
+      <!-- 背景环 -->
+      <circle cx="6.5" cy="6.5" r="5" 
+              stroke="#E5E5EA" 
+              stroke-width="2" 
+              fill="none"/>
+      <!-- 前景进度环 -->
+      <circle id="progress" cx="6.5" cy="6.5" r="5"
+              stroke="#3C3C43" 
+              stroke-opacity="0.8"
+              stroke-width="2" 
+              fill="none"
+              stroke-linecap="round"
+              stroke-dasharray="0 999"/>
+    </svg>
+  </div>
+
+  <br><br>
+  <input type="range" min="0" max="100" value="0" id="slider" />
+
+  <script>
+    const circle = document.getElementById("progress");
+    const slider = document.getElementById("slider");
+
+    const R = 5;                           // 半径
+    const C = 2 * Math.PI * R;             // 周长
+    circle.setAttribute("stroke-dasharray", `${C} ${C}`);
+    circle.setAttribute("stroke-dashoffset", C);
+
+    function setProgress(pct) {
+      const offset = C * (1 - pct / 100);
+      circle.setAttribute("stroke-dashoffset", offset);
+    }
+
+    slider.addEventListener("input", e => {
+      setProgress(e.target.value);
+    });
+
+    // 默认显示 40% 进度
+    setProgress(40);
+  </script>
+</body>
+</html>

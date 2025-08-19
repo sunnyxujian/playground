@@ -1,0 +1,39 @@
+<div style="font-size: 30px;">测试文本</div>
+<img width="120" height="30" id="preview" />
+
+<script>
+function createHighResCanvas(displayWidth, displayHeight, exportScale = 1) {
+  const ratio = window.devicePixelRatio || 1;
+  const canvas = document.createElement('canvas');
+  canvas.width = displayWidth * ratio * exportScale;
+  canvas.height = displayHeight * ratio * exportScale;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(ratio * exportScale, ratio * exportScale);
+  return { ctx, canvas };
+}
+
+function exportTextImage(text, displayWidth, displayHeight, exportScale = 1) {
+  // 创建临时 canvas
+  const { ctx, canvas } = createHighResCanvas(displayWidth, displayHeight, exportScale);
+
+  ctx.font = '30px Arial';
+  ctx.fillStyle = '#000';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, displayWidth / 2, displayHeight / 2 + 2);
+
+  // 生成图片
+  const dataURL = canvas.toDataURL('image/png');
+
+  // 主动释放内存（可选）
+  canvas.width = 0;
+  canvas.height = 0;
+
+  // 不再持有 canvas 引用，让 GC 自动回收
+  return dataURL;
+}
+
+// 使用
+document.getElementById('preview').src = exportTextImage('测试文本', 120, 30, 1);
+
+</script>
