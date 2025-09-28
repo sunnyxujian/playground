@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>fabricjs-点九图</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+    <style>
+      canvas {
+        border: 1px solid #ccc;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="canvas-container">
+      <canvas id="canvas" width="800" height="800"></canvas>
+    </div>
+
+    <script>
+      fabric.PointNineImage = fabric.util.createClass(fabric.Object, {
+        type: "pointNineImage",
+
+        initialize: function (options) {
+          options = options || {};
+          this.callSuper("initialize", options);
+
+          this.img = options.img;
+          this.padding = options.padding || 20;
+
+          this.naturalWidth = this.img.width;
+          this.naturalHeight = this.img.height;
+
+          this.width = options.width || this.naturalWidth;
+          this.height = options.height || this.naturalHeight;
+        },
+
+        _render: function (ctx) {
+          if (!this.img) return;
+
+          const p = this.padding;
+          const w = this.width;
+          const h = this.height;
+          const iw = this.naturalWidth;
+          const ih = this.naturalHeight;
+
+          // 四角
+          ctx.drawImage(this.img, 0, 0, p, p, 0, 0, p, p);
+          ctx.drawImage(this.img, iw - p, 0, p, p, w - p, 0, p, p);
+          ctx.drawImage(this.img, 0, ih - p, p, p, 0, h - p, p, p);
+          ctx.drawImage(this.img, iw - p, ih - p, p, p, w - p, h - p, p, p);
+
+          // 四边拉伸
+          ctx.drawImage(this.img, p, 0, iw - 2 * p, p, p, 0, w - 2 * p, p);
+          ctx.drawImage(
+            this.img,
+            p,
+            ih - p,
+            iw - 2 * p,
+            p,
+            p,
+            h - p,
+            w - 2 * p,
+            p
+          );
+          ctx.drawImage(this.img, 0, p, p, ih - 2 * p, 0, p, p, h - 2 * p);
+          ctx.drawImage(
+            this.img,
+            iw - p,
+            p,
+            p,
+            ih - 2 * p,
+            w - p,
+            p,
+            p,
+            h - 2 * p
+          );
+
+          // 中间拉伸
+          ctx.drawImage(
+            this.img,
+            p,
+            p,
+            iw - 2 * p,
+            ih - 2 * p,
+            p,
+            p,
+            w - 2 * p,
+            h - 2 * p
+          );
+        },
+
+        _set: function (key, value) {
+          this.callSuper("_set", key, value);
+          // 这里 scale 不做处理，直接用 width/height 改尺寸即可
+        },
+
+        _getNonTransformedDimensions: function () {
+          return { x: this.width, y: this.height };
+        },
+
+        _getTransformedDimensions: function () {
+          return { x: this.width, y: this.height };
+        },
+      });
+
+      const canvas = new fabric.Canvas("canvas");
+
+      const img = new Image();
+      img.src = "./xros_overview_large_2x.9.png";
+      img.onload = () => {
+        const nineImg = new fabric.PointNineImage({
+          img,
+          left: 50,
+          top: 50,
+          width: 300,
+          height: 200,
+          padding: 20,
+        });
+
+        canvas.add(nineImg);
+        canvas.requestRenderAll();
+      };
+    </script>
+  </body>
+</html>
