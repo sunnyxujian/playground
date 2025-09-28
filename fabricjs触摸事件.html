@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
+    <title>fabricjs触摸事件</title>
     <script src="./fabric.min.js"></script>
     <style>
       canvas {
@@ -40,7 +40,7 @@
 
     canvas.on({
       "touch:gesture": function (...args) {
-        console.log('🚀 ~ args=>', args)
+        console.log("🚀 ~ args=>", args);
         // var text = document.createTextNode(" Gesture ");
         info.insertBefore(text, info.firstChild);
       },
