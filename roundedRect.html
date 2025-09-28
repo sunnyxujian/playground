@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Fabric.js 水平可拉伸圆角矩形（圆角不拉伸）</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+    <style>
+      #canvas-container {
+        display: flex;
+        justify-content: center;
+        margin-top: 50px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="canvas-container">
+      <canvas id="canvas" width="800" height="300"></canvas>
+    </div>
+
+    <script>
+      fabric.TopRoundedRect = fabric.util.createClass(fabric.Object, {
+        type: "top-rounded-rect",
+
+        initialize: function (options = {}) {
+          this.callSuper("initialize", options);
+
+          let r = options.radius || 0;
+          if (typeof r === "number") {
+            r = { tl: r, tr: r, br: r, bl: r };
+          }
+
+          this.set({
+            width: options.width || 200,
+            height: options.height || 100,
+            radius: Object.assign({ tl: 0, tr: 0, br: 0, bl: 0 }, r),
+            fill: options.fill || "transparent",
+            stroke: options.stroke || "black",
+            strokeWidth: options.strokeWidth || 1,
+            noScaleCache: false, // 让 Fabric 重新计算缓存
+          });
+        },
+
+        _render: function (ctx) {
+          const w = this.width; // 直接用逻辑宽高
+          const h = this.height;
+          const r = { ...this.radius };
+
+          // 限制圆角
+          r.tl = Math.min(r.tl, w / 2, h / 2);
+          r.tr = Math.min(r.tr, w / 2, h / 2);
+          r.br = Math.min(r.br, w / 2, h / 2);
+          r.bl = Math.min(r.bl, w / 2, h / 2);
+
+          ctx.beginPath();
+          ctx.moveTo(r.tl, 0);
+          ctx.lineTo(w - r.tr, 0);
+          ctx.quadraticCurveTo(w, 0, w, r.tr);
+
+          ctx.lineTo(w, h - r.br);
+          ctx.quadraticCurveTo(w, h, w - r.br, h);
+
+          ctx.lineTo(r.bl, h);
+          ctx.quadraticCurveTo(0, h, 0, h - r.bl);
+
+          ctx.lineTo(0, r.tl);
+          ctx.quadraticCurveTo(0, 0, r.tl, 0);
+
+          ctx.closePath();
+
+          this._renderFill(ctx);
+          this._renderStroke(ctx);
+        },
+
+        // 关键：重写 _getNonTransformedDimensions，让控制框基于 width/height
+        // _getNonTransformedDimensions() {
+        //   return new fabric.Point(this.width, this.height);
+        // },
+      });
+
+      fabric.TopRoundedRect.fromObject = function (object, callback) {
+        return fabric.Object._fromObject("TopRoundedRect", object, callback);
+      };
+
+      const canvas = new fabric.Canvas("canvas", { width: 800, height: 800 });
+
+      const rect = new fabric.TopRoundedRect({
+        left: 50,
+        top: 50,
+        width: 200,
+        height: 50,
+        radius: { tl: 40, tr: 30, br: 20, bl: 10 }, // 半径比高度还大
+        fill: "orange",
+        stroke: "#333",
+        strokeWidth: 2,
+      });
+
+      canvas.add(rect);
+      canvas.setActiveObject(rect);
+    </script>
+  </body>
+</html>

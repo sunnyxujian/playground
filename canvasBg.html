@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>画布点阵背景 + 缩放/拖动</title>
+    <script src="https://cdn.jsdelivr.net/npm/fabric@5.2.1/dist/fabric.min.js"></script>
+    <style>
+      canvas {
+        border: 1px solid #ccc;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c" width="600" height="600"></canvas>
+    <script>
+      const canvas = new fabric.Canvas("c", {
+        backgroundColor: "#fff",
+        selection: false, // 方便演示拖动画布
+      });
+
+      const pattern = makeDotPattern();
+      canvas.setBackgroundColor(pattern, canvas.requestRenderAll.bind(canvas));
+
+      function makeDotPattern() {
+        const { radius, gap, color } = {
+          color: "#D1D5DB",
+          radius: 1.5,
+          gap: 16,
+        };
+        const dpr = window.devicePixelRatio || 1;
+
+        const tile = document.createElement("canvas");
+        const ctx = tile.getContext("2d");
+
+        tile.width = gap * dpr;
+        tile.height = gap * dpr;
+        ctx.scale(dpr, dpr);
+
+        ctx.beginPath();
+        ctx.arc(radius, radius, radius, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+
+        return new fabric.Pattern({
+          source: tile,
+          repeat: "repeat",
+        });
+      }
+
+      // ========== 滚轮缩放 ==========
+      canvas.on("mouse:wheel", function (opt) {
+        const delta = opt.e.deltaY;
+        let zoom = canvas.getZoom();
+        zoom *= 0.999 ** delta; // 平滑缩放
+        if (zoom > 3) zoom = 3; // 最大缩放倍数
+        if (zoom < 0.5) zoom = 0.5; // 最小缩放倍数
+        canvas.zoomToPoint({ x: opt.e.offsetX, y: opt.e.offsetY }, zoom);
+        opt.e.preventDefault();
+        opt.e.stopPropagation();
+      });
+
+      // ========== 鼠标拖动画布 ==========
+      let isDragging = false;
+      let lastPosX, lastPosY;
+
+      canvas.on("mouse:down", function (opt) {
+        // 按住 Alt 或中键拖拽
+        isDragging = true;
+        lastPosX = opt.e.clientX;
+        lastPosY = opt.e.clientY;
+      });
+
+      canvas.on("mouse:move", function (opt) {
+        if (isDragging) {
+          console.log("🚀 ~ opt=>", opt);
+          const e = opt.e;
+          const vpt = canvas.viewportTransform;
+          vpt[4] += e.clientX - lastPosX;
+          vpt[5] += e.clientY - lastPosY;
+          canvas.requestRenderAll();
+          lastPosX = e.clientX;
+          lastPosY = e.clientY;
+        }
+      });
+
+      canvas.on("mouse:up", function () {
+        isDragging = false;
+      });
+    </script>
+  </body>
+</html>

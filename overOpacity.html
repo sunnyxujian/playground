@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fabric 实时半透明示例</title>
+    <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
+    <style>
+      body {
+        margin: 10px;
+        font-family: sans-serif;
+      }
+      canvas {
+        border: 1px solid #ddd;
+      }
+    </style>
+  </head>
+  <body>
+    <button id="addImg">添加图片</button>
+    <canvas id="c" width="800" height="500"></canvas>
+
+    <script>
+      const canvas = new fabric.Canvas("c", { preserveObjectStacking: true });
+
+      // workspace（第一个元素，内容区域）
+      const workspace = new fabric.Rect({
+        left: 150,
+        top: 80,
+        width: 400,
+        height: 300,
+        fill: "#fafafa",
+        selectable: false,
+        evented: false,
+      });
+      canvas.add(workspace);
+
+      // 将 workspace 的四角点（canvas 坐标）转成对象 local 坐标并裁剪后绘制不透明部分
+      function applyMaskEffect(obj, workspace) {
+        // 禁用对象缓存，保证每次渲染都会走 _render（否则缓存可能阻止更新）
+        obj.set({ objectCaching: false });
+
+        const originalRender = obj._render;
+        obj._render = function (ctx) {
+          // 1) 先画整张（半透明）——表示区域外显示为 50%
+          ctx.save();
+          ctx.globalAlpha = 0.5;
+          originalRender.call(this, ctx);
+          ctx.restore();
+
+          // 2) 计算 workspace 四个顶点在当前对象局部坐标系下的位置
+          // workspace.getCoords() 返回 canvas 坐标系下的 4 个角（顺时针或逆时针）
+          const wsCorners = workspace.getCoords(); // [{x,y}, ...] in canvas coords
+          // this.calcTransformMatrix() : 从对象局部 -> canvas 的 transform 矩阵 (6 数组)
+          const objToCanvas = this.calcTransformMatrix();
+          const canvasToObj = fabric.util.invertTransform(objToCanvas);
+
+          // 3) 在对象的局部坐标系下做 clip，并再次绘制（不透明）
+          ctx.save();
+          ctx.beginPath();
+          for (let i = 0; i < wsCorners.length; i++) {
+            const pCanvas = wsCorners[i];
+            const pLocal = fabric.util.transformPoint(pCanvas, canvasToObj);
+            if (i === 0) ctx.moveTo(pLocal.x, pLocal.y);
+            else ctx.lineTo(pLocal.x, pLocal.y);
+          }
+          ctx.closePath();
+          ctx.clip();
+
+          // 绘制被裁剪区域（区域内不透明）
+          ctx.save();
+          ctx.globalAlpha = 1;
+          originalRender.call(this, ctx);
+          ctx.restore();
+
+          ctx.restore();
+        };
+
+        // 更新对象坐标缓存
+        obj.setCoords();
+      }
+
+      // 点击添加图片示例
+      document.getElementById("addImg").onclick = () => {
+        fabric.Image.fromURL("https://fabricjs.com/assets/pug.jpg", (img) => {
+          img.set({
+            left: 80,
+            top: 40,
+            scaleX: 0.9,
+            scaleY: 0.9,
+            cornerStyle: "square",
+          });
+          applyMaskEffect(img, workspace);
+          canvas.add(img);
+          canvas.setActiveObject(img);
+          canvas.requestRenderAll();
+        });
+      };
+
+      // 小提示：如果想支持任意对象（rect/text/path/etc.），都可以调用 applyMaskEffect(obj, workspace).
+    </script>
+  </body>
+</html>

@@ -1,0 +1,223 @@
+{
+  "version": "5.3.0",
+  "template_name": "",
+  "backgroundImage": "",
+  "designWidth": 390,
+  "tools": [],
+  "machine_code": "DBM202405270001",
+  "machine_name": "B21",
+  "material_id": 1088,
+  "material_name": "热敏合成纸-通用",
+  "process_id": 0,
+  "use_id": 11,
+  "width": 50,
+  "height": 30,
+  "minWidth": 10,
+  "minHeight": 20,
+  "maxWidth": 50,
+  "maxHeight": 200,
+  "shape_id": 6,
+  "size_id": 16,
+  "is_size_swap": 2,
+  "border": "2",
+  "max_rounded": false,
+  "size_ratio": false,
+  "size_init": false,
+  "borderRadiusList": [
+    "top_left",
+    "top_right",
+    "bottom_left",
+    "bottom_right"
+  ],
+  "backgroundColor": "#e60012",
+  "bg_color_type": "normal",
+  "cmyk": "",
+  "bg_color_id": 59,
+  "is_pattern": false,
+  "pattern_id": 0,
+  "maxRow": 2,
+  "row": 1,
+  "maxColumn": 1,
+  "column": 1,
+  "hasBorder": 0,
+  "typesettingSpacing": 0,
+  "borderSpacing": 0,
+  "unit": "mm",
+  "jump_distance": 6,
+  "core_size": 25.5,
+  "print_length": 500,
+  "material_round": 1,
+  "material_jump_distance": true,
+  "scaleX": 3.5260930888575457,
+  "scaleY": 3.5294117647058822,
+  "els": [
+    {
+      "type": "path",
+      "version": "5.3.0",
+      "originX": "left",
+      "originY": "top",
+      "left": -0.5,
+      "top": 24.6,
+      "width": 141.7,
+      "height": 59.9,
+      "fill": "#ffffff",
+      "stroke": null,
+      "strokeWidth": 1,
+      "strokeDashArray": null,
+      "strokeLineCap": "butt",
+      "strokeDashOffset": 0,
+      "strokeLineJoin": "miter",
+      "strokeUniform": false,
+      "strokeMiterLimit": 4,
+      "scaleX": 1,
+      "scaleY": 1,
+      "angle": 0,
+      "flipX": false,
+      "flipY": false,
+      "opacity": 1,
+      "shadow": null,
+      "visible": true,
+      "backgroundColor": "",
+      "fillRule": "nonzero",
+      "paintFirst": "fill",
+      "globalCompositeOperation": "source-over",
+      "skewX": 0,
+      "skewY": 0,
+      "id": "58f1a4d6-6ff3-494b-a700-f0f5102cc7d4",
+      "selectable": true,
+      "hasControls": true,
+      "editable": true,
+      "path": [
+        [
+          "M",
+          136.1,
+          85
+        ],
+        [
+          "L",
+          5.7,
+          85
+        ],
+        [
+          "C",
+          2.6,
+          85,
+          0,
+          82.5,
+          0,
+          79.4
+        ],
+        [
+          "L",
+          0,
+          25.1
+        ],
+        [
+          "L",
+          141.7,
+          25.1
+        ],
+        [
+          "L",
+          141.7,
+          79.4
+        ],
+        [
+          "C",
+          141.7,
+          82.5,
+          139.2,
+          85,
+          136.1,
+          85
+        ]
+      ]
+    },
+    {
+      "type": "path",
+      "version": "5.3.0",
+      "originX": "left",
+      "originY": "top",
+      "left": -0.5,
+      "top": 24.6,
+      "width": 30,
+      "height": 21.5964,
+      "fill": "#808080",
+      "stroke": "",
+      "strokeWidth": 0,
+      "strokeDashArray": null,
+      "strokeLineCap": "butt",
+      "strokeDashOffset": 0,
+      "strokeLineJoin": "miter",
+      "strokeUniform": true,
+      "strokeMiterLimit": 4,
+      "scaleX": 1,
+      "scaleY": 1,
+      "angle": 0,
+      "flipX": false,
+      "flipY": false,
+      "opacity": 1,
+      "shadow": null,
+      "visible": true,
+      "backgroundColor": "",
+      "fillRule": "nonzero",
+      "paintFirst": "fill",
+      "globalCompositeOperation": "source-over",
+      "skewX": 0,
+      "skewY": 0,
+      "id": "71b8f7cb-f09b-41de-9745-27b647486766",
+      "selectable": true,
+      "hasControls": true,
+      "path": [
+        [
+          "M",
+          1.286411662,
+          52.96413417
+        ],
+        [
+          "C",
+          1.286411662,
+          57.51433882,
+          7.6643211,
+          61.60300859,
+          15.5830893,
+          61.60300859
+        ],
+        [
+          "L",
+          129.6128362,
+          61.60300859
+        ],
+        [
+          "C",
+          136.9496927,
+          61.60300859,
+          140.4128362,
+          57.51433882,
+          140.4128362,
+          52.96413417
+        ],
+        [
+          "L",
+          140.4128362,
+          0.565463984
+        ],
+        [
+          "L",
+          1.286411662,
+          0.565463984
+        ],
+        [
+          "L",
+          1.286411662,
+          52.96413417
+        ],
+        [
+          "Z"
+        ]
+      ]
+    }
+  ],
+  "uos_model_code": "DBM202405270001",
+  "fillCmyk": "0.0.0.0"
+}
