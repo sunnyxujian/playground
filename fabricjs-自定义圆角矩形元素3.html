@@ -18,14 +18,17 @@
       const CustomRect = fabric.util.createClass(fabric.Rect, {
         type: "custom-rect",
 
+        // 常量定义
+        minSize: 10,
+
         initialize: function (options) {
           options || (options = {});
           this.callSuper("initialize", options);
 
           if (options.maxRadius) {
             this.maxRadius = true;
-            this.width = Math.max(this.width, 5);
-            this.height = Math.max(this.height, 5);
+            this.width = Math.max(this.width, this.minSize);
+            this.height = Math.max(this.height, this.minSize);
             const r = Math.min(this.width, this.height) / 2 + 10;
             this.radius = [
               [r, r],
@@ -97,21 +100,34 @@
         },
 
         _render: function (ctx) {
-          const w = Math.max(this.width, 5);
-          const h = Math.max(this.height, 5);
-          const x = -w / 2,
-            y = -h / 2;
+          const w = Math.max(this.width, this.minSize);
+          const h = Math.max(this.height, this.minSize);
+          const x = -w / 2;
+          const y = -h / 2;
 
           ctx.beginPath();
 
           if (this.maxRadius) {
-            const r = h / 2;
-            ctx.moveTo(x + r, y);
-            ctx.lineTo(x + w - r, y);
-            ctx.arcTo(x + w, y, x + w, y + h, r);
-            ctx.arcTo(x + w, y + h, x, y + h, r);
-            ctx.arcTo(x, y + h, x, y, r);
-            ctx.arcTo(x, y, x + w, y, r);
+            // 根据宽高比例决定横向或纵向跑道圆
+            if (w > h) {
+              // 横向跑道圆：高度为直径
+              const r = h / 2;
+              ctx.moveTo(x + r, y);
+              ctx.lineTo(x + w - r, y);
+              ctx.arcTo(x + w, y, x + w, y + h, r);
+              ctx.arcTo(x + w, y + h, x, y + h, r);
+              ctx.arcTo(x, y + h, x, y, r);
+              ctx.arcTo(x, y, x + w, y, r);
+            } else {
+              // 纵向跑道圆：宽度为直径
+              const r = w / 2;
+              ctx.moveTo(x + r, y);
+              ctx.lineTo(x + w - r, y);
+              ctx.arcTo(x + w, y, x + w, y + h, r);
+              ctx.arcTo(x + w, y + h, x, y + h, r);
+              ctx.arcTo(x, y + h, x, y, r);
+              ctx.arcTo(x, y, x + w, y, r);
+            }
             ctx.closePath();
           } else {
             const [tl, tr, br, bl] = this.radius;
@@ -153,19 +169,25 @@
               newH = Math.max(1, newH);
 
               if (target.maxRadius) {
-                // 跑道圆逻辑
-                let radius = newH / 2;
+                // 跑道圆逻辑：根据宽高比例决定方向
+                if (newW > newH) {
+                  // 横向跑道圆：高度为直径
+                  newH = Math.max(newH, this.minSize);
+                  const radius = newH / 2;
+                  newW = Math.max(newW, radius * 2);
+                } else {
+                  // 纵向跑道圆：宽度为直径
+                  newW = Math.max(newW, this.minSize);
+                  const radius = newW / 2;
+                  newH = Math.max(newH, radius * 2);
+                }
 
-                // 宽高约束：宽度不能小于 2 * 半径，且高度最小 5
-                newH = Math.max(newH, 5);
-                radius = newH / 2;
-                newW = Math.max(newW, radius * 2);
-
+                // 设置圆角为最大圆角模式
                 target.radius = [
-                  [radius, radius],
-                  [radius, radius],
-                  [radius, radius],
-                  [radius, radius],
+                  [Math.min(newW, newH) / 2, Math.min(newW, newH) / 2],
+                  [Math.min(newW, newH) / 2, Math.min(newW, newH) / 2],
+                  [Math.min(newW, newH) / 2, Math.min(newW, newH) / 2],
+                  [Math.min(newW, newH) / 2, Math.min(newW, newH) / 2],
                 ];
               } else if (target.radius) {
                 // 普通圆角矩形逻辑
@@ -208,8 +230,14 @@
               // 根据圆角计算最小宽度
               let minWidth = 1;
               if (target.maxRadius) {
-                // 跑道圆模式：最小宽度是高度的2倍
-                minWidth = target.height;
+                // 跑道圆模式：根据方向决定最小宽度
+                if (target.width > target.height) {
+                  // 横向跑道圆：最小宽度是高度的2倍
+                  minWidth = target.height;
+                } else {
+                  // 纵向跑道圆：最小宽度是5
+                  minWidth = this.minSize;
+                }
               } else if (target.radius) {
                 // 普通圆角矩形：最小宽度是左上+右上和左下+右下圆角X值的较大者
                 const [tl, tr, br, bl] = target.radius;
@@ -245,8 +273,14 @@
               // 根据圆角计算最小宽度
               let minWidth = 1;
               if (target.maxRadius) {
-                // 跑道圆模式：最小宽度是高度的2倍
-                minWidth = target.height;
+                // 跑道圆模式：根据方向决定最小宽度
+                if (target.width > target.height) {
+                  // 横向跑道圆：最小宽度是高度的2倍
+                  minWidth = target.height;
+                } else {
+                  // 纵向跑道圆：最小宽度是5
+                  minWidth = this.minSize;
+                }
               } else if (target.radius) {
                 // 普通圆角矩形：最小宽度是左上+右上和左下+右下圆角X值的较大者
                 const [tl, tr, br, bl] = target.radius;
@@ -289,8 +323,14 @@
               // 根据圆角计算最小高度
               let minHeight = 1;
               if (target.maxRadius) {
-                // 跑道圆模式：最小高度是5
-                minHeight = 5;
+                // 跑道圆模式：根据方向决定最小高度
+                if (target.width > target.height) {
+                  // 横向跑道圆：最小高度是5
+                  minHeight = this.minSize;
+                } else {
+                  // 纵向跑道圆：最小高度是宽度的2倍
+                  minHeight = target.width;
+                }
               } else if (target.radius) {
                 // 普通圆角矩形：最小高度是左上+左下和右上+右下圆角Y值的较大者
                 const [tl, tr, br, bl] = target.radius;
@@ -333,8 +373,14 @@
               // 根据圆角计算最小高度
               let minHeight = 1;
               if (target.maxRadius) {
-                // 跑道圆模式：最小高度是5
-                minHeight = 5;
+                // 跑道圆模式：根据方向决定最小高度
+                if (target.width > target.height) {
+                  // 横向跑道圆：最小高度是5
+                  minHeight = this.minSize;
+                } else {
+                  // 纵向跑道圆：最小高度是宽度的2倍
+                  minHeight = target.width;
+                }
               } else if (target.radius) {
                 // 普通圆角矩形：最小高度是左上+左下和右上+右下圆角Y值的较大者
                 const [tl, tr, br, bl] = target.radius;
