@@ -200,9 +200,20 @@
           newW = RoundRectUtils.calculateMinConstraint(target, "width", newW);
 
           const deltaW = newW - target.width;
+
+          // 计算旋转后的偏移量
+          const angle = (target.angle * Math.PI) / 180;
+          const cos = Math.cos(angle);
+          const sin = Math.sin(angle);
+
+          // 计算在旋转坐标系中的偏移
+          const offsetX = -deltaW * cos;
+          const offsetY = -deltaW * sin;
+
           target.set({
             width: newW,
-            left: target.left - deltaW,
+            left: target.left + offsetX,
+            top: target.top + offsetY,
             scaleX: 1,
           });
           return true;
@@ -214,9 +225,21 @@
           newH = RoundRectUtils.calculateMinConstraint(target, "height", newH);
 
           const deltaH = newH - target.height;
+
+          // 计算旋转后的偏移量
+          const angle = (target.angle * Math.PI) / 180;
+          const cos = Math.cos(angle);
+          const sin = Math.sin(angle);
+
+          // 上边控制点：高度变化时，需要考虑旋转后的Y轴方向
+          // 在旋转坐标系中，Y轴的变化需要投影到实际的X和Y坐标
+          const offsetX = deltaH * sin; // 修正：应该是正号
+          const offsetY = -deltaH * cos; // 修正：Y方向偏移
+
           target.set({
             height: newH,
-            top: target.top - deltaH,
+            left: target.left + offsetX,
+            top: target.top + offsetY,
             scaleY: 1,
           });
           return true;
@@ -433,6 +456,20 @@
         maxRadius: true,
       });
       canvas.add(rect4);
+
+      // 添加一个旋转的测试用例
+      const rect5 = new fabric.RoundRect({
+        left: 300,
+        top: 120,
+        width: 100,
+        height: 60,
+        fill: "lightcoral",
+        stroke: "black",
+        strokeWidth: 1,
+        radius: [10, 10, 10, 10],
+        angle: 45, // 旋转45度
+      });
+      canvas.add(rect5);
     </script>
   </body>
 </html>
