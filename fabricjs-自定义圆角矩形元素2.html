@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>fabricjs自定义圆角矩形元素</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+    <style>
+      canvas {
+        border: 1px solid #ccc;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="canvas-container">
+      <canvas id="canvas" width="800" height="800"></canvas>
+    </div>
+
+    <script>
+      const MIN = 10;
+      const CustomRect = fabric.util.createClass(fabric.Rect, {
+        type: "custom-rect",
+
+        initialize: function (options) {
+          options || (options = {});
+          this.callSuper("initialize", options);
+
+          // 如果 maxRadius 为 true，则忽略 radius 配置
+          if (options.maxRadius) {
+            this.maxRadius = true;
+            this.width = Math.max(this.width, MIN);
+            this.height = Math.max(this.height, MIN);
+
+            // 计算半径，跑道圆是高度的一半
+            const r = Math.min(this.width, this.height) / 2 + 10;
+            this.radius = [
+              [r, r],
+              [r, r],
+              [r, r],
+              [r, r],
+            ];
+          } else {
+            this.maxRadius = false;
+            this._parseRadius(options.radius || 0);
+          }
+
+          this.set({
+            lockScalingX: true,
+            lockScalingY: true,
+            objectCaching: false,
+          });
+
+          this._initCustomControls();
+        },
+
+        _parseRadius: function (radius) {
+          let r = [];
+
+          if (typeof radius === "number") {
+            r = [
+              [radius, radius],
+              [radius, radius],
+              [radius, radius],
+              [radius, radius],
+            ];
+          } else if (Array.isArray(radius)) {
+            if (radius.length === 2) {
+              r = [
+                [radius[0], radius[0]],
+                [radius[1], radius[1]],
+                [radius[0], radius[0]],
+                [radius[1], radius[1]],
+              ];
+            } else if (radius.length === 3) {
+              r = [
+                [radius[0], radius[0]],
+                [radius[1], radius[1]],
+                [radius[2], radius[2]],
+                [radius[1], radius[1]],
+              ];
+            } else if (radius.length === 4) {
+              r = [
+                [radius[0], radius[0]],
+                [radius[1], radius[1]],
+                [radius[2], radius[2]],
+                [radius[3], radius[3]],
+              ];
+            } else if (Array.isArray(radius[0])) {
+              r = radius;
+            }
+          }
+
+          if (!r.length) {
+            r = [
+              [0, 0],
+              [0, 0],
+              [0, 0],
+              [0, 0],
+            ];
+          }
+
+          this.radius = r;
+        },
+
+        _render: function (ctx) {
+          const w = Math.max(this.width, MIN);
+          const h = Math.max(this.height, MIN);
+          const x = -w / 2,
+            y = -h / 2;
+
+          ctx.beginPath();
+
+          if (this.maxRadius) {
+            const r = h / 2; // 高度/2
+            // 左半圆
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.arcTo(x + w, y, x + w, y + h, r); // 右上半圆
+            ctx.arcTo(x + w, y + h, x, y + h, r); // 右下半圆
+            ctx.arcTo(x, y + h, x, y, r); // 左下半圆
+            ctx.arcTo(x, y, x + w, y, r); // 左上半圆
+            ctx.closePath();
+          } else {
+            const [tl, tr, br, bl] = this.radius;
+            ctx.moveTo(x + tl[0], y);
+            ctx.lineTo(x + w - tr[0], y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + tr[1]);
+            ctx.lineTo(x + w, y + h - br[1]);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - br[0], y + h);
+            ctx.lineTo(x + bl[0], y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - bl[1]);
+            ctx.lineTo(x, y + tl[1]);
+            ctx.quadraticCurveTo(x, y, x + tl[0], y);
+            ctx.closePath();
+          }
+
+          this._renderFill(ctx);
+          this._renderStroke(ctx);
+        },
+        _initCustomControls: function () {
+          const updateSize = (target, newW, newH) => {
+            newW = Math.max(1, newW);
+            newH = Math.max(1, newH);
+
+            if (target.maxRadius) {
+              let radius = newH / 2;
+              newH = Math.max(newH, MIN);
+              radius = newH / 2;
+              newW = Math.max(newW, radius * 2);
+              target.radius = [
+                [radius, radius],
+                [radius, radius],
+                [radius, radius],
+                [radius, radius],
+              ];
+            } else if (target.radius) {
+              const maxRx = Math.max(...target.radius.map((r) => r[0]));
+              const maxRy = Math.max(...target.radius.map((r) => r[1]));
+              newW = Math.max(newW, maxRx * 2);
+              newH = Math.max(newH, maxRy * 2);
+            }
+
+            target.set({
+              width: newW,
+              height: newH,
+              scaleX: 1,
+              scaleY: 1,
+            });
+            target.setCoords();
+          };
+
+          // 🔹右下角（保留原有）
+          this.controls.br = new fabric.Control({
+            x: 0.5,
+            y: 0.5,
+            cursorStyle: "nwse-resize",
+            actionHandler: (eventData, transform, x, y) => {
+              const target = transform.target;
+              const canvas = target.canvas;
+              const local = target.toLocalPoint(
+                new fabric.Point(x, y),
+                "center",
+                "center"
+              );
+              updateSize(
+                target,
+                local.x + target.width / 2,
+                local.y + target.height / 2
+              );
+              canvas.requestRenderAll();
+              return true;
+            },
+          });
+
+          // 🔹上中（mt）
+          this.controls.mt = new fabric.Control({
+            x: 0,
+            y: -0.5,
+            cursorStyle: "ns-resize",
+            actionHandler: (eventData, transform, x, y) => {
+              const target = transform.target;
+              const canvas = target.canvas;
+              const local = target.toLocalPoint(
+                new fabric.Point(x, y),
+                "center",
+                "center"
+              );
+
+              const newHeight = target.height - local.y * 2; // 因为是从上边往下推
+              const dy = (target.height - newHeight) / 2;
+              target.top += dy; // 向下偏移一半差值
+
+              updateSize(target, target.width, newHeight);
+              canvas.requestRenderAll();
+              return true;
+            },
+          });
+
+          // 🔹下中（mb）
+          this.controls.mb = new fabric.Control({
+            x: 0,
+            y: 0.5,
+            cursorStyle: "ns-resize",
+            actionHandler: (eventData, transform, x, y) => {
+              const target = transform.target;
+              const canvas = target.canvas;
+              const local = target.toLocalPoint(
+                new fabric.Point(x, y),
+                "center",
+                "center"
+              );
+
+              const newHeight = local.y + target.height / 2;
+              const dy = (newHeight - target.height) / 2;
+              target.top += dy;
+
+              updateSize(target, target.width, newHeight);
+              canvas.requestRenderAll();
+              return true;
+            },
+          });
+
+          // 🔹左中（ml）
+          this.controls.ml = new fabric.Control({
+            x: -0.5,
+            y: 0,
+            cursorStyle: "ew-resize",
+            actionHandler: (eventData, transform, x, y) => {
+              const target = transform.target;
+              const canvas = target.canvas;
+              const local = target.toLocalPoint(
+                new fabric.Point(x, y),
+                "center",
+                "center"
+              );
+
+              const newWidth = target.width - local.x * 2; // 因为是从左往右推
+              const dx = (target.width - newWidth) / 2;
+              target.left += dx;
+
+              updateSize(target, newWidth, target.height);
+              canvas.requestRenderAll();
+              return true;
+            },
+          });
+
+          // 🔹右中（mr）
+          this.controls.mr = new fabric.Control({
+            x: 0.5,
+            y: 0,
+            cursorStyle: "ew-resize",
+            actionHandler: (eventData, transform, x, y) => {
+              const target = transform.target;
+              const canvas = target.canvas;
+              const local = target.toLocalPoint(
+                new fabric.Point(x, y),
+                "center",
+                "center"
+              );
+
+              const newWidth = local.x + target.width / 2;
+              const dx = (newWidth - target.width) / 2;
+              target.left += dx;
+
+              updateSize(target, newWidth, target.height);
+              canvas.requestRenderAll();
+              return true;
+            },
+          });
+        },
+      });
+
+      fabric.CustomRect = CustomRect;
+
+      fabric.CustomRect.fromObject = (options, callback) => {
+        const { radius } = options;
+        return callback(new fabric.CustomRect(radius, options));
+      };
+
+      const canvas = new fabric.Canvas("canvas", { width: 800, height: 800 });
+
+      // 使用
+      const rect = new fabric.CustomRect({
+        left: 20,
+        top: 20,
+        width: 100,
+        height: 50,
+        fill: "lightblue",
+        stroke: "black",
+        strokeWidth: 1,
+        radius: [0, 5, 10, 15], // CSS border-radius 风格
+      });
+      canvas.add(rect);
+
+      const rect2 = new fabric.CustomRect({
+        left: 150,
+        top: 20,
+        width: 150,
+        height: 50,
+        fill: "lightgreen",
+        stroke: "black",
+        strokeWidth: 1,
+        radius: [0, 0, 10, 10], // CSS border-radius 风格
+      });
+
+      canvas.add(rect2);
+
+      const rect3 = new fabric.CustomRect({
+        left: 320,
+        top: 20,
+        width: 50,
+        height: 150,
+        fill: "lightgreen",
+        stroke: "black",
+        strokeWidth: 1,
+        radius: [10, 0, 0, 10], // CSS border-radius 风格
+      });
+      canvas.add(rect3);
+
+      const rect4 = new fabric.CustomRect({
+        left: 20,
+        top: 120,
+        width: 200,
+        height: 80,
+        fill: "lightgreen",
+        stroke: "black",
+        strokeWidth: 1,
+        maxRadius: true,
+      });
+      canvas.add(rect4);
+    </script>
+  </body>
+</html>

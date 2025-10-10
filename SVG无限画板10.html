@@ -1,0 +1,1479 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVG画板</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .toolbar {
+            display: flex;
+            padding: 5px;
+            background: #f0f0f0;
+        }
+
+        button {
+            padding: 5px 10px;
+            cursor: pointer;
+        }
+
+        .canvas-container {
+            flex: 1;
+            border: 1px solid #ccc;
+            position: relative;
+            overflow: hidden;
+        }
+
+            .canvas-container svg * {
+                vector-effect: non-scaling-stroke;
+            }
+
+        #svg-canvas {
+            width: 100%;
+            height: 100%;
+            background-color: white;
+            touch-action: none;
+        }
+
+        .zoom-info {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0);
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+
+        .drawing-tools {
+            display: flex;
+            gap: 5px;
+        }
+
+            .drawing-tools button.active {
+                background-color: #4CAF50;
+                color: white;
+            }
+
+        .properties-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            width: 250px;
+            display: none;
+        }
+
+            .properties-panel h3 {
+                margin-top: 0;
+                border-bottom: 1px solid #ddd;
+                padding-bottom: 5px;
+            }
+
+        .property-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+
+            .property-row label {
+                font-weight: bold;
+            }
+
+        .selection-box {
+            position: absolute;
+            border: 2px solid #0066ff;
+            pointer-events: none;
+            display: none;
+        }
+
+        .selected-element {
+            stroke: #0066ff !important;
+            stroke-width: 2px !important;
+        }
+
+        /* 图层相关样式 */
+        g.layer {
+            transform: translate(0.5px, 0.5px);
+            /*transform: translate(0.5px, 0.5px) scale(0.2);*/
+        }
+
+        .layers-panel {
+            position: absolute;
+            top: 50px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            width: 200px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .layer-item {
+            display: flex;
+            align-items: center;
+            padding: 5px;
+            margin-bottom: 3px;
+            background: #f5f5f5;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+            .layer-item:hover {
+                background: #e0e0e0;
+            }
+
+            .layer-item.active {
+                background: #d0e0ff;
+            }
+
+        .layer-visibility {
+            margin-right: 8px;
+            cursor: pointer;
+        }
+
+        .layer-name {
+            flex-grow: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .layer-controls {
+            display: flex;
+            margin-top: 10px;
+        }
+
+            .layer-controls button {
+                flex-grow: 1;
+                margin: 0 2px;
+                padding: 3px 5px;
+                font-size: 12px;
+            }
+    </style>
+</head>
+<body>
+    <div class="toolbar">
+        <div class="drawing-tools">
+            <button id="select-tool" class="active">选择</button>
+            <button id="rect-tool">矩形</button>
+            <button id="circle-tool">圆形</button>
+            <button id="line-tool">直线</button>
+            <button id="path-tool">路径</button>
+            <button id="layers-btn">图层</button>
+            <button id="delete-btn" title="删除选中元素 (Delete)" disabled>删除</button>
+            <button id="undo-btn" title="撤销 (Ctrl+Z)">撤销</button>
+            <button id="redo-btn" title="重做 (Ctrl+Y)">重做</button>
+            <button id="clear-btn">清空</button>
+            <button id="save-btn">保存</button>
+            <button id="load-btn">加载</button>
+        </div>
+        <input type="file" id="file-input" style="display: none;" accept=".svg,.json">
+    </div>
+
+    <div class="canvas-container">
+        <svg id="svg-canvas" xmlns="http://www.w3.org/2000/svg"></svg>
+        <div class="selection-box" id="selection-box"></div>
+        <div class="zoom-info">缩放: <span id="zoom-level">100%</span></div>
+        <div class="properties-panel" id="properties-panel">
+            <h3>属性</h3>
+            <div id="properties-content"></div>
+        </div>
+        <!-- 图层面板 -->
+        <div class="layers-panel" id="layers-panel" style="display: none;">
+            <h3>图层</h3>
+            <div id="layers-list"></div>
+            <div class="layer-controls">
+                <button id="add-layer-btn">添加</button>
+                <button id="delete-layer-btn">删除</button>
+                <button id="move-up-btn">上移</button>
+                <button id="move-down-btn">下移</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const svgCanvas = document.getElementById('svg-canvas');
+            const canvasContainer = document.querySelector('.canvas-container');
+            const zoomLevel = document.getElementById('zoom-level');
+            const fileInput = document.getElementById('file-input');
+            const selectionBox = document.getElementById('selection-box');
+            const propertiesPanel = document.getElementById('properties-panel');
+            const propertiesContent = document.getElementById('properties-content');
+            // 图层相关变量
+            const layersPanel = document.getElementById('layers-panel');
+            const layersList = document.getElementById('layers-list');
+            const addLayerBtn = document.getElementById('add-layer-btn');
+            const deleteLayerBtn = document.getElementById('delete-layer-btn');
+            const moveUpBtn = document.getElementById('move-up-btn');
+            const moveDownBtn = document.getElementById('move-down-btn');
+            const layersBtn = document.getElementById('layers-btn');
+
+            // 状态管理
+            let state = {
+                currentTool: 'select',
+                isDrawing: false,
+                isMoving: false,
+                currentElement: null,
+                selectedElement: null,
+                startX: 0,
+                startY: 0,
+                elements: [],
+                history: [],
+                historyIndex: -1,
+                transform: {
+                    x: 0,
+                    y: 0,
+                    scale: 1
+                },
+                pathPoints: [],
+                moveOffset: { x: 0, y: 0 },
+                // 图层状态
+                layers: [],
+                activeLayer: null,
+                nextLayerId: 1
+            };
+
+            // 初始化图层
+            function initLayers() {
+                // 创建默认图层
+                createLayer("图层 1");
+            }
+
+            // 初始化SVG画布
+            function initCanvas() {
+                svgCanvas.setAttribute('viewBox', `0 0 ${svgCanvas.clientWidth} ${svgCanvas.clientHeight}`);
+                updateCanvasTransform();
+    
+                // 尝试从本地存储加载
+                loadFromLocalStorage();
+    
+                // 如果没有加载到数据，初始化默认画布
+                if (state.layers.length === 0) {
+                    initDefaultCanvas();
+                }
+            }
+
+            //===================================
+            // 保存到本地存储 - 完全有效的版本
+            function saveToLocalStorage() {
+                try {
+                    // 准备要保存的数据
+                    const data = {
+                        layers: state.layers.map(layer => ({
+                            id: layer.id,
+                            name: layer.name,
+                            visible: layer.visible,
+                            elements: Array.from(layer.group.children).map(el => serializeSVGElement(el))
+                        })),
+                        activeLayerId: state.activeLayer ? state.activeLayer.id : null,
+                        transform: {...state.transform},
+                            nextLayerId: state.nextLayerId,
+                            version: 1 // 更新版本号
+                        };
+
+                    // 保存到localStorage
+                    localStorage.setItem('svgEditorData', JSON.stringify(data));
+                    //console.log('成功保存到本地存储');
+
+                } catch (error) {
+                    //console.error('保存到本地存储失败:', error);
+                }
+            }
+
+            // 从本地存储加载 - 完全有效的版本
+            function loadFromLocalStorage() {
+                const savedData = localStorage.getItem('svgEditorData');
+                if (!savedData) {
+                    //console.log('没有找到保存的数据');
+                    return;
+                }
+
+                try {
+                    const data = JSON.parse(savedData);
+
+                    // 清空当前状态
+                    clearAllLayers();
+                    state.nextLayerId = data.nextLayerId || 1;
+
+                    // 恢复图层
+                    data.layers.forEach(layerData => {
+                        const layer = {
+                            id: layerData.id,
+                            name: layerData.name,
+                            visible: layerData.visible,
+                            group: document.createElementNS('http://www.w3.org/2000/svg', 'g'),
+                            elements: []
+                        };
+
+                        layer.group.setAttribute('class', 'layer');
+                        layer.group.setAttribute('data-layer-id', layerData.id);
+                        layer.group.style.display = layerData.visible ? '' : 'none';
+
+                        // 恢复图层中的元素
+                        layerData.elements.forEach(elementData => {
+                            const element = deserializeSVGElement(elementData);
+                            if (element) {
+                                layer.group.appendChild(element);
+                                layer.elements.push(element);
+                            }
+                        });
+
+                        svgCanvas.appendChild(layer.group);
+                        state.layers.push(layer);
+                    });
+
+                    // 设置活动图层
+                    if (data.activeLayerId) {
+                        const activeLayer = state.layers.find(l => l.id === data.activeLayerId);
+                        if (activeLayer) setActiveLayer(activeLayer);
+                    }
+        
+                    // 默认设置第一个图层为活动图层
+                    if (!state.activeLayer && state.layers.length > 0) {
+                        setActiveLayer(state.layers[0]);
+                    }
+
+                    // 恢复变换状态(这个可以保持缩放比例)
+                    //if (data.transform) {
+                    //    state.transform = {...data.transform};
+                    //    updateCanvasTransform();
+                    //}
+
+                    // 更新UI
+                    updateLayersList();
+                    updateUndoRedoButtons();
+
+                    // 保存到历史记录
+                    saveToHistory();
+
+                    console.log('成功从本地存储加载');
+                } catch (error) {
+                    console.error('从本地存储加载失败:', error);
+                    // 如果加载失败，初始化一个新的画布
+                    initDefaultCanvas();
+                }
+            }
+
+            // 辅助函数：清空所有图层
+            function clearAllLayers() {
+                while (svgCanvas.firstChild) {
+                    svgCanvas.removeChild(svgCanvas.firstChild);
+                }
+                state.layers = [];
+                state.activeLayer = null;
+            }
+
+            // 辅助函数：序列化SVG元素
+            function serializeSVGElement(element) {
+                const serializer = new XMLSerializer();
+                const serialized = serializer.serializeToString(element);
+    
+                // 获取元素类型和关键属性
+                const type = element.tagName.toLowerCase();
+                const bbox = element.getBBox ? element.getBBox() : null;
+    
+                return {
+                    type: type,
+                    html: serialized,
+                    bbox: bbox ? {x: bbox.x, y: bbox.y, width: bbox.width, height: bbox.height} : null
+                };
+            }
+
+            // 辅助函数：反序列化SVG元素
+            function deserializeSVGElement(elementData) {
+                try {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(elementData.html, 'image/svg+xml');
+                    const element = doc.documentElement;
+        
+                    // 确保元素在SVG命名空间中
+                    if (element.namespaceURI !== 'http://www.w3.org/2000/svg') {
+                        throw new Error('元素不在SVG命名空间中');
+                    }
+        
+                    // 重新创建元素以确保正确性
+                    const newElement = document.createElementNS('http://www.w3.org/2000/svg', element.tagName.toLowerCase());
+        
+                    // 复制所有属性
+                    Array.from(element.attributes).forEach(attr => {
+                        newElement.setAttribute(attr.name, attr.value);
+                    });
+        
+                    // 特殊处理路径元素
+                    if (element.tagName.toLowerCase() === 'path') {
+                        newElement.setAttribute('d', element.getAttribute('d'));
+                    }
+        
+                    return newElement;
+                } catch (error) {
+                    console.error('反序列化元素失败:', error);
+                    return null;
+                }
+            }
+
+            // 初始化默认画布
+            function initDefaultCanvas() {
+                clearAllLayers();
+                createLayer("图层 1");
+                state.transform = {x: 0, y: 0, scale: 1};
+                updateCanvasTransform();
+                saveToHistory();
+            }
+
+            //===================================
+
+            // 创建新图层
+            function createLayer(name) {
+                const layerId = state.nextLayerId++;
+                const layerName = name || `图层 ${layerId}`;
+
+                const layer = {
+                    id: layerId,
+                    name: layerName,
+                    visible: true,
+                    group: document.createElementNS('http://www.w3.org/2000/svg', 'g'),
+                    elements: []
+                };
+
+                layer.group.setAttribute('class', 'layer');
+                layer.group.setAttribute('data-layer-id', layerId);
+                svgCanvas.appendChild(layer.group);
+
+                state.layers.push(layer);
+
+                // 设置为活动图层
+                setActiveLayer(layer);
+
+                // 更新图层列表显示
+                updateLayersList();
+
+                return layer;
+            }
+
+            // 设置活动图层
+            function setActiveLayer(layer) {
+                if (state.activeLayer) {
+                    state.activeLayer.group.style.opacity = 1;
+                }
+
+                state.activeLayer = layer;
+                layer.group.style.opacity = 0.8;
+
+                // 更新图层列表中的活动状态
+                updateLayersList();
+            }
+
+            // 删除当前图层
+            function deleteActiveLayer() {
+                if (!state.activeLayer || state.layers.length <= 1) return;
+
+                const index = state.layers.findIndex(l => l.id === state.activeLayer.id);
+                if (index === -1) return;
+
+                // 从SVG中移除图层组
+                svgCanvas.removeChild(state.activeLayer.group);
+
+                // 从状态中移除图层
+                state.layers.splice(index, 1);
+
+                // 设置新的活动图层
+                const newActiveIndex = Math.min(index, state.layers.length - 1);
+                setActiveLayer(state.layers[newActiveIndex]);
+
+                // 更新图层列表显示
+                updateLayersList();
+
+                // 保存历史状态
+                saveToHistory();
+            }
+
+            // 上移图层
+            function moveLayerUp() {
+                if (!state.activeLayer) return;
+
+                const index = state.layers.findIndex(l => l.id === state.activeLayer.id);
+                if (index <= 0) return;
+
+                // 交换图层顺序
+                [state.layers[index], state.layers[index - 1]] = [state.layers[index - 1], state.layers[index]];
+
+                // 更新SVG中的图层顺序
+                svgCanvas.insertBefore(state.activeLayer.group, state.layers[index].group);
+
+                // 更新图层列表显示
+                updateLayersList();
+
+                // 保存历史状态
+                saveToHistory();
+            }
+
+            // 下移图层
+            function moveLayerDown() {
+                if (!state.activeLayer) return;
+
+                const index = state.layers.findIndex(l => l.id === state.activeLayer.id);
+                if (index >= state.layers.length - 1) return;
+
+                // 交换图层顺序
+                [state.layers[index], state.layers[index + 1]] = [state.layers[index + 1], state.layers[index]];
+
+                // 更新SVG中的图层顺序
+                if (index + 2 < state.layers.length) {
+                    svgCanvas.insertBefore(state.layers[index + 1].group, state.activeLayer.group);
+                } else {
+                    svgCanvas.appendChild(state.activeLayer.group);
+                }
+
+                // 更新图层列表显示
+                updateLayersList();
+
+                // 保存历史状态
+                saveToHistory();
+            }
+
+            // 切换图层可见性
+            function toggleLayerVisibility(layer) {
+                layer.visible = !layer.visible;
+                layer.group.style.display = layer.visible ? '' : 'none';
+                updateLayersList();
+                saveToHistory();
+            }
+
+            // 更新图层列表显示
+            function updateLayersList() {
+                layersList.innerHTML = '';
+
+                state.layers.forEach(layer => {
+                    const layerItem = document.createElement('div');
+                    layerItem.className = `layer-item ${layer === state.activeLayer ? 'active' : ''}`;
+                    layerItem.setAttribute('data-layer-id', layer.id);
+
+                    layerItem.innerHTML = `
+                        <span class="layer-visibility">${layer.visible ? '👁️' : '🚫'}</span>
+                        <span class="layer-name">${layer.name}</span>
+                    `;
+
+                    // 点击图层项设置为活动图层
+                    layerItem.addEventListener('click', (e) => {
+                        if (e.target.classList.contains('layer-visibility')) return;
+                        setActiveLayer(layer);
+                    });
+
+                    // 点击眼睛图标切换可见性
+                    const visibilityIcon = layerItem.querySelector('.layer-visibility');
+                    visibilityIcon.addEventListener('click', () => {
+                        toggleLayerVisibility(layer);
+                    });
+
+                    layersList.appendChild(layerItem);
+                });
+
+                // 更新图层控制按钮状态
+                deleteLayerBtn.disabled = state.layers.length <= 1;
+                moveUpBtn.disabled = !state.activeLayer || state.layers[0] === state.activeLayer;
+                moveDownBtn.disabled = !state.activeLayer || state.layers[state.layers.length - 1] === state.activeLayer;
+            }
+
+            // 更新画布变换
+            function updateCanvasTransform() {
+                const viewBox = [
+                    -state.transform.x / state.transform.scale,
+                    -state.transform.y / state.transform.scale,
+                    svgCanvas.clientWidth / state.transform.scale,
+                    svgCanvas.clientHeight / state.transform.scale
+                ].join(' ');
+
+                svgCanvas.setAttribute('viewBox', viewBox);
+                zoomLevel.textContent = `${Math.round(state.transform.scale * 100)}%`;
+            }
+
+            // 保存当前状态到历史记录
+            function saveToHistory() {
+                // 复制图层结构
+                const layersCopy = state.layers.map(layer => ({
+                    id: layer.id,
+                    name: layer.name,
+                    visible: layer.visible,
+                    elements: Array.from(layer.group.children).map(el => el.cloneNode(true))
+                }));
+
+                // 保存到历史记录
+                state.history.push({
+                    layers: layersCopy,
+                    activeLayerId: state.activeLayer ? state.activeLayer.id : null,
+                    transform: {...state.transform}
+                });
+
+                state.historyIndex = state.history.length - 1;
+                updateUndoRedoButtons();
+            }
+
+            // 撤销
+            function undo() {
+                if (state.historyIndex > 0) {
+                    state.historyIndex--;
+                    restoreState();
+                }
+            }
+
+            // 重做
+            function redo() {
+                if (state.historyIndex < state.history.length - 1) {
+                    state.historyIndex++;
+                    restoreState();
+                }
+            }
+
+            // 恢复状态
+            function restoreState() {
+                const historyState = state.history[state.historyIndex];
+
+                // 清空SVG画布
+                while (svgCanvas.firstChild) {
+                    svgCanvas.removeChild(svgCanvas.firstChild);
+                }
+
+                // 恢复图层结构
+                state.layers = historyState.layers.map(layerData => {
+                    const layer = {
+                        id: layerData.id,
+                        name: layerData.name,
+                        visible: layerData.visible,
+                        group: document.createElementNS('http://www.w3.org/2000/svg', 'g'),
+                        elements: []
+                    };
+
+                    layer.group.setAttribute('data-layer-id', layerData.id);
+                    layer.group.style.display = layerData.visible ? '' : 'none';
+
+                    // 恢复图层元素
+                    layerData.elements.forEach(el => {
+                        layer.group.appendChild(el);
+                        layer.elements.push(el);
+                    });
+
+                    return layer;
+                });
+
+                // 重新添加到SVG中
+                state.layers.forEach(layer => {
+                    svgCanvas.appendChild(layer.group);
+                });
+
+                // 设置活动图层
+                if (historyState.activeLayerId) {
+                    const activeLayer = state.layers.find(l => l.id === historyState.activeLayerId);
+                    if (activeLayer) {
+                        setActiveLayer(activeLayer);
+                    }
+                }
+
+                // 恢复变换
+                state.transform = {...historyState.transform};
+                updateCanvasTransform();
+
+                // 清除选择状态
+                clearSelection();
+
+                updateUndoRedoButtons();
+                updateLayersList();
+            }
+
+            // 更新撤销/重做按钮状态
+            function updateUndoRedoButtons() {
+                document.getElementById('undo-btn').disabled = state.historyIndex <= 0;
+                document.getElementById('redo-btn').disabled = state.historyIndex >= state.history.length - 1;
+            }
+
+            // 保存SVG
+            function saveSVG() {
+                const serializer = new XMLSerializer();
+                let svgStr = serializer.serializeToString(svgCanvas);
+
+                // 添加XML声明和DOCTYPE
+                svgStr = '<?xml version="1.0" standalone="no"?>\n' +
+                         '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">\n' +
+                         svgStr;
+
+                // 创建Blob对象
+                const blob = new Blob([svgStr], {type: 'image/svg+xml'});
+                const url = URL.createObjectURL(blob);
+
+                // 创建下载链接
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'drawing.svg';
+                document.body.appendChild(a);
+                a.click();
+
+                // 清理
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 0);
+            }
+
+            // 加载SVG
+            function loadSVG() {
+                fileInput.click();
+            }
+
+            // 处理文件加载
+            fileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const content = e.target.result;
+
+                    // 清空当前画布
+                    while (svgCanvas.firstChild) {
+                        svgCanvas.removeChild(svgCanvas.firstChild);
+                    }
+
+                    // 解析SVG内容
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(content, 'image/svg+xml');
+                    const loadedSvg = doc.querySelector('svg');
+
+                    if (loadedSvg) {
+                        // 创建默认图层
+                        initLayers();
+
+                        // 将加载的元素添加到默认图层
+                        Array.from(loadedSvg.children).forEach(child => {
+                            state.activeLayer.group.appendChild(child);
+                            state.activeLayer.elements.push(child);
+                        });
+
+                        // 重置变换
+                        state.transform = {x: 0, y: 0, scale: 1};
+                        updateCanvasTransform();
+
+                        // 保存历史状态
+                        saveToHistory();
+                    }
+                };
+
+                reader.readAsText(file);
+                fileInput.value = ''; // 重置文件输入，允许重复选择同一文件
+            });
+
+            // 工具按钮事件
+            document.getElementById('select-tool').addEventListener('click', () => {
+                state.currentTool = 'select';
+                updateActiveTool();
+                clearSelection();
+            });
+
+            document.getElementById('rect-tool').addEventListener('click', () => {
+                state.currentTool = 'rect';
+                updateActiveTool();
+                clearSelection();
+            });
+
+            document.getElementById('circle-tool').addEventListener('click', () => {
+                state.currentTool = 'circle';
+                updateActiveTool();
+                clearSelection();
+            });
+
+            document.getElementById('line-tool').addEventListener('click', () => {
+                state.currentTool = 'line';
+                updateActiveTool();
+                clearSelection();
+            });
+
+            document.getElementById('path-tool').addEventListener('click', () => {
+                state.currentTool = 'path';
+                updateActiveTool();
+                clearSelection();
+            });
+
+            // 图层按钮事件
+            layersBtn.addEventListener('click', () => {
+                layersPanel.style.display = layersPanel.style.display === 'none' ? 'block' : 'none';
+            });
+            addLayerBtn.addEventListener('click', () => {
+                createLayer();
+                saveToHistory();
+            });
+            deleteLayerBtn.addEventListener('click', deleteActiveLayer);
+            moveUpBtn.addEventListener('click', moveLayerUp);
+            moveDownBtn.addEventListener('click', moveLayerDown);
+
+            // 删除按钮
+            document.getElementById('delete-btn').addEventListener('click', deleteSelected);
+
+            // 更新活动工具按钮样式
+            function updateActiveTool() {
+                document.querySelectorAll('.drawing-tools button').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+                document.getElementById(`${state.currentTool}-tool`).classList.add('active');
+            }
+
+            // 按钮事件
+            document.getElementById('undo-btn').addEventListener('click', undo);
+            document.getElementById('redo-btn').addEventListener('click', redo);
+            document.getElementById('clear-btn').addEventListener('click', () => {
+                if (!confirm("你确定要清空画板中全部的图形吗？")) {
+                    return;
+                }
+                // 清空所有图层
+                state.layers.forEach(layer => {
+                    while (layer.group.firstChild) {
+                        layer.group.removeChild(layer.group.firstChild);
+                    }
+                    layer.elements = [];
+                });
+                clearSelection();
+                saveToHistory();
+            });
+            document.getElementById('save-btn').addEventListener('click', saveSVG);
+            document.getElementById('load-btn').addEventListener('click', loadSVG);
+
+            // 键盘快捷键
+            document.addEventListener('keydown', function(e) {
+                if (e.ctrlKey) {
+                    if (e.key === 'z') {
+                        e.preventDefault();
+                        undo();
+                    } else if (e.key === 'y') {
+                        e.preventDefault();
+                        redo();
+                    }
+                } else if (e.key === 'Delete' && state.selectedElement) {
+                    e.preventDefault();
+                    deleteSelected();
+                }
+            });
+
+            // 鼠标/触摸事件处理
+            svgCanvas.addEventListener('mousedown', startDrawing);
+            svgCanvas.addEventListener('mousemove', moveDrawing);
+            svgCanvas.addEventListener('mouseup', endDrawing);
+            svgCanvas.addEventListener('mouseleave', endDrawing);
+
+            // 触摸事件支持
+            svgCanvas.addEventListener('touchstart', handleTouchStart, {passive: false});
+            svgCanvas.addEventListener('touchmove', handleTouchMove, {passive: false});
+            svgCanvas.addEventListener('touchend', handleTouchEnd);
+
+            // 平移画布
+            let isPanning = false;
+            let lastX, lastY;
+
+            function startPanning(e) {
+                if (state.currentTool === 'select' && !state.isDrawing && !state.selectedElement) {
+                    isPanning = true;
+                    lastX = e.clientX || e.touches[0].clientX;
+                    lastY = e.clientY || e.touches[0].clientY;
+                    e.preventDefault();
+                }
+            }
+
+            function pan(e) {
+                if (isPanning) {
+                    const x = e.clientX || e.touches[0].clientX;
+                    const y = e.clientY || e.touches[0].clientY;
+
+                    const dx = x - lastX;
+                    const dy = y - lastY;
+
+                    state.transform.x += dx;
+                    state.transform.y += dy;
+
+                    updateCanvasTransform();
+
+                    lastX = x;
+                    lastY = y;
+                    e.preventDefault();
+                }
+            }
+
+            function endPanning() {
+                isPanning = false;
+            }
+
+            // 缩放画布
+            function handleZoom(e) {
+                e.preventDefault();
+
+                const rect = svgCanvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                const y = e.clientY - rect.top;
+
+                // 计算鼠标位置相对于viewBox的坐标
+                const viewBoxX = (x - state.transform.x) / state.transform.scale;
+                const viewBoxY = (y - state.transform.y) / state.transform.scale;
+
+                // 调整缩放比例
+                const delta = e.deltaY > 0 ? 0.8 : 1.2;
+                state.transform.scale *= delta;
+
+                // 限制缩放范围
+                state.transform.scale = Math.max(0.1, Math.min(10, state.transform.scale));
+
+                // 调整平移，使鼠标位置保持在同一位置
+                state.transform.x = x - viewBoxX * state.transform.scale;
+                state.transform.y = y - viewBoxY * state.transform.scale;
+
+                updateCanvasTransform();
+            }
+
+            // 选择元素
+            function selectElement(element, clientX, clientY) {
+                // 清除之前的选择
+                clearSelection();
+
+                // 设置新选择
+                state.selectedElement = element;
+                //element.classList.add('selected-element');
+
+                // 更新选择框
+                updateSelectionBox(element);
+
+                // 显示属性面板
+                //showPropertiesPanel(element, clientX, clientY);
+
+                // 启用删除按钮
+                document.getElementById('delete-btn').disabled = false;
+
+                // 找到元素所在的图层并设置为活动图层
+                const layerId = element.parentNode.getAttribute('data-layer-id');
+                if (layerId) {
+                    const layer = state.layers.find(l => l.id == layerId);
+                    if (layer) {
+                        setActiveLayer(layer);
+                    }
+                }
+            }
+
+            // 清除选择
+            function clearSelection() {
+                if (state.selectedElement) {
+                    //state.selectedElement.classList.remove('selected-element');
+                    state.selectedElement = null;
+                }
+
+                // 隐藏选择框和属性面板
+                selectionBox.style.display = 'none';
+                propertiesPanel.style.display = 'none';
+
+                // 禁用删除按钮
+                document.getElementById('delete-btn').disabled = true;
+            }
+
+            // 更新选择框
+            function updateSelectionBox(element) {
+                const bbox = element.getBBox();
+
+                // 计算选择框在屏幕上的位置
+                //const rect = svgCanvas.getBoundingClientRect();
+                const x = bbox.x * state.transform.scale + state.transform.x;
+                const y = bbox.y * state.transform.scale + state.transform.y;
+                const width = bbox.width * state.transform.scale;
+                const height = bbox.height * state.transform.scale;
+
+                //selectionBox.style.left = `${rect.left + x}px`;
+                //selectionBox.style.top = `${rect.top + y}px`;
+                //selectionBox.style.width = `${width}px`;
+                //selectionBox.style.height = `${height}px`;
+                //selectionBox.style.display = 'block';
+
+                selectionBox.style.left = `${x}px`;
+                selectionBox.style.top = `${y}px`;
+                selectionBox.style.width = `${width}px`;
+                selectionBox.style.height = `${height}px`;
+                selectionBox.style.display = 'block';
+
+            }
+
+            // 显示属性面板
+            function showPropertiesPanel(element, clientX, clientY) {
+                propertiesContent.innerHTML = '';
+
+                // 根据元素类型显示不同属性
+                const tagName = element.tagName.toLowerCase();
+
+                if (tagName === 'rect') {
+                    addPropertyInput('X', element.getAttribute('x'), value => {
+                        element.setAttribute('x', value);
+                        updateSelectionBox(element);
+                    });
+
+                    addPropertyInput('Y', element.getAttribute('y'), value => {
+                        element.setAttribute('y', value);
+                        updateSelectionBox(element);
+                    });
+
+                    addPropertyInput('宽度', element.getAttribute('width'), value => {
+                        element.setAttribute('width', value);
+                        updateSelectionBox(element);
+                    });
+
+                    addPropertyInput('高度', element.getAttribute('height'), value => {
+                        element.setAttribute('height', value);
+                        updateSelectionBox(element);
+                    });
+
+                    addPropertyInput('填充', element.getAttribute('fill') || 'none', value => {
+                        element.setAttribute('fill', value);
+                    });
+
+                    addPropertyInput('描边', element.getAttribute('stroke') || 'black', value => {
+                        element.setAttribute('stroke', value);
+                    });
+
+                    addPropertyInput('描边宽度', element.getAttribute('stroke-width') || '1', value => {
+                        element.setAttribute('stroke-width', value);
+                    });
+                } else if (tagName === 'circle') {
+                    addPropertyInput('中心X', element.getAttribute('cx'), value => {
+                        element.setAttribute('cx', value);
+                        updateSelectionBox(element);
+                    });
+
+                    addPropertyInput('中心Y', element.getAttribute('cy'), value => {
+                        element.setAttribute('cy', value);
+                        updateSelectionBox(element);
+                    });
+
+                    addPropertyInput('半径', element.getAttribute('r'), value => {
+                        element.setAttribute('r', value);
+                        updateSelectionBox(element);
+                    });
+
+                    addPropertyInput('填充', element.getAttribute('fill') || 'none', value => {
+                        element.setAttribute('fill', value);
+                    });
+
+                    addPropertyInput('描边', element.getAttribute('stroke') || 'black', value => {
+                        element.setAttribute('stroke', value);
+                    });
+
+                    addPropertyInput('描边宽度', element.getAttribute('stroke-width') || '1', value => {
+                        element.setAttribute('stroke-width', value);
+                    });
+                } else if (tagName === 'line') {
+                    addPropertyInput('起点X', element.getAttribute('x1'), value => {
+                        element.setAttribute('x1', value);
+                        updateSelectionBox(element);
+                    });
+
+                    addPropertyInput('起点Y', element.getAttribute('y1'), value => {
+                        element.setAttribute('y1', value);
+                        updateSelectionBox(element);
+                    });
+
+                    addPropertyInput('终点X', element.getAttribute('x2'), value => {
+                        element.setAttribute('x2', value);
+                        updateSelectionBox(element);
+                    });
+
+                    addPropertyInput('终点Y', element.getAttribute('y2'), value => {
+                        element.setAttribute('y2', value);
+                        updateSelectionBox(element);
+                    });
+
+                    addPropertyInput('描边', element.getAttribute('stroke') || 'black', value => {
+                        element.setAttribute('stroke', value);
+                    });
+
+                    addPropertyInput('描边宽度', element.getAttribute('stroke-width') || '1', value => {
+                        element.setAttribute('stroke-width', value);
+                    });
+                } else if (tagName === 'path') {
+                    addPropertyInput('描边', element.getAttribute('stroke') || 'black', value => {
+                        element.setAttribute('stroke', value);
+                    });
+
+                    addPropertyInput('描边宽度', element.getAttribute('stroke-width') || '1', value => {
+                        element.setAttribute('stroke-width', value);
+                    });
+                }
+
+                // 定位属性面板
+                const rect = canvasContainer.getBoundingClientRect();
+                propertiesPanel.style.left = `${clientX - rect.left}px`;
+                propertiesPanel.style.top = `${clientY - rect.top}px`;
+                propertiesPanel.style.display = 'block';
+            }
+
+            // 添加属性输入行
+            function addPropertyInput(label, value, onChange) {
+                const row = document.createElement('div');
+                row.className = 'property-row';
+
+                const labelEl = document.createElement('label');
+                labelEl.textContent = label;
+
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = value;
+                input.addEventListener('change', () => {
+                    onChange(input.value);
+                    saveToHistory();
+                });
+
+                row.appendChild(labelEl);
+                row.appendChild(input);
+                propertiesContent.appendChild(row);
+            }
+
+            // 删除选中元素
+            function deleteSelected() {
+                if (state.selectedElement) {
+                    // 从图层中移除元素
+                    const layer = state.layers.find(l => l.group === state.selectedElement.parentNode);
+                    if (layer) {
+                        const index = layer.elements.indexOf(state.selectedElement);
+                        if (index !== -1) {
+                            layer.elements.splice(index, 1);
+                        }
+                    }
+
+                    // 从DOM中移除元素
+                    state.selectedElement.parentNode.removeChild(state.selectedElement);
+
+                    clearSelection();
+                    saveToHistory();
+                }
+            }
+
+            // 开始移动元素
+            function startMovingElement(element, clientX, clientY) {
+                state.isMoving = true;
+                state.selectedElement = element;
+
+                // 计算元素位置
+                const bbox = element.getBBox();
+                const rect = svgCanvas.getBoundingClientRect();
+
+                // 计算鼠标与元素位置的偏移量
+                state.moveOffset.x = (clientX - rect.left - state.transform.x) / state.transform.scale - bbox.x;
+                state.moveOffset.y = (clientY - rect.top - state.transform.y) / state.transform.scale - bbox.y;
+
+                // 添加选中样式
+                //element.classList.add('selected-element');
+                updateSelectionBox(element);
+            }
+
+            // 移动元素
+            function moveElement(clientX, clientY) {
+                if (!state.isMoving || !state.selectedElement) return;
+
+                const rect = svgCanvas.getBoundingClientRect();
+                const x = (clientX - rect.left - state.transform.x) / state.transform.scale - state.moveOffset.x;
+                const y = (clientY - rect.top - state.transform.y) / state.transform.scale - state.moveOffset.y;
+
+                const tagName = state.selectedElement.tagName.toLowerCase();
+
+                if (tagName === 'rect') {
+                    state.selectedElement.setAttribute('x', x);
+                    state.selectedElement.setAttribute('y', y);
+                } else if (tagName === 'circle') {
+                    state.selectedElement.setAttribute('cx', x);
+                    state.selectedElement.setAttribute('cy', y);
+                } else if (tagName === 'line') {
+                    const dx = parseFloat(state.selectedElement.getAttribute('x2')) -
+                               parseFloat(state.selectedElement.getAttribute('x1'));
+                    const dy = parseFloat(state.selectedElement.getAttribute('y2')) -
+                               parseFloat(state.selectedElement.getAttribute('y1'));
+
+                    state.selectedElement.setAttribute('x1', x);
+                    state.selectedElement.setAttribute('y1', y);
+                    state.selectedElement.setAttribute('x2', x + dx);
+                    state.selectedElement.setAttribute('y2', y + dy);
+                } else if (tagName === 'path') {
+                    // 移动路径比较复杂，这里简化处理
+                    const dx = x - parseFloat(state.selectedElement.getAttribute('data-origin-x') || '0');
+                    const dy = y - parseFloat(state.selectedElement.getAttribute('data-origin-y') || '0');
+
+                    // 更新路径数据
+                    const d = state.selectedElement.getAttribute('d');
+                    const newD = d.replace(/([ML])\s*([\d.]+)\s+([\d.]+)/g, (match, cmd, x, y) => {
+                        return `${cmd} ${parseFloat(x) + dx} ${parseFloat(y) + dy}`;
+                    });
+
+                    state.selectedElement.setAttribute('d', newD);
+                    state.selectedElement.setAttribute('data-origin-x', x);
+                    state.selectedElement.setAttribute('data-origin-y', y);
+                }
+
+                updateSelectionBox(state.selectedElement);
+            }
+
+            // 结束移动元素
+            function endMovingElement() {
+                if (state.isMoving) {
+                    state.isMoving = false;
+                    saveToHistory();
+                    saveToLocalStorage();
+                }
+            }
+
+            // 绘图函数
+            function startDrawing(e) {
+                // 点击空白处，清除任何现有选择
+                if (e.target === svgCanvas) {
+                    clearSelection();
+                }
+
+                const rect = svgCanvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left - state.transform.x) / state.transform.scale;
+                const y = (e.clientY - rect.top - state.transform.y) / state.transform.scale;
+
+                // 检查是否点击了现有元素
+                const elements = document.elementsFromPoint(e.clientX, e.clientY);
+                const svgElement = elements.find(el => el !== selectionBox && el.parentNode !== svgCanvas);
+
+                if (state.currentTool === 'select') {
+                    if (svgElement && svgElement !== svgCanvas) {
+                        // 选择或开始移动元素
+                        if (e.shiftKey) {
+                            // 多选 (TODO: 实现多选)
+                        } else {
+                            selectElement(svgElement, e.clientX, e.clientY);
+                            startMovingElement(svgElement, e.clientX, e.clientY);
+                        }
+                        e.preventDefault();
+                        return;
+                    } else {
+                        // 开始平移画布
+                        startPanning(e);
+                        return;
+                    }
+                }
+
+                // 清除任何现有选择
+                clearSelection();
+
+                state.isDrawing = true;
+                state.startX = x;
+                state.startY = y;
+
+                if (state.currentTool === 'path') {
+                    state.pathPoints = [{x, y}];
+                    state.currentElement = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    state.currentElement.setAttribute('fill', 'none');
+                    state.currentElement.setAttribute('stroke', 'black');
+                    state.currentElement.setAttribute('stroke-width', '1');
+                    state.currentElement.setAttribute('data-origin-x', x);
+                    state.currentElement.setAttribute('data-origin-y', y);
+                } else if (state.currentTool === 'rect') {
+                    state.currentElement = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    state.currentElement.setAttribute('x', x);
+                    state.currentElement.setAttribute('y', y);
+                    state.currentElement.setAttribute('width', '0');
+                    state.currentElement.setAttribute('height', '0');
+                    state.currentElement.setAttribute('fill', '#E1FFFF');
+                    state.currentElement.setAttribute('stroke', 'black');
+                    state.currentElement.setAttribute('stroke-width', '1');
+                } else if (state.currentTool === 'circle') {
+                    state.currentElement = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    state.currentElement.setAttribute('cx', x);
+                    state.currentElement.setAttribute('cy', y);
+                    state.currentElement.setAttribute('r', '0');
+                    state.currentElement.setAttribute('fill', '#E1FFFF');
+                    state.currentElement.setAttribute('stroke', 'black');
+                    state.currentElement.setAttribute('stroke-width', '1');
+                } else if (state.currentTool === 'line') {
+                    state.currentElement = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    state.currentElement.setAttribute('x1', x);
+                    state.currentElement.setAttribute('y1', y);
+                    state.currentElement.setAttribute('x2', x);
+                    state.currentElement.setAttribute('y2', y);
+                    state.currentElement.setAttribute('stroke', 'black');
+                    state.currentElement.setAttribute('stroke-width', '1');
+                }
+
+                // 在创建新元素后，将其添加到活动图层而不是直接添加到svgCanvas
+                if (state.currentElement) {
+                    state.activeLayer.group.appendChild(state.currentElement);
+                    state.activeLayer.elements.push(state.currentElement);
+                }
+
+            }
+
+            function moveDrawing(e) {
+                if (isPanning) {
+                    pan(e);
+                    return;
+                }
+
+                if (state.isMoving) {
+                    moveElement(e.clientX, e.clientY);
+                    return;
+                }
+
+                if (!state.isDrawing) return;
+
+                const rect = svgCanvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left - state.transform.x) / state.transform.scale;
+                const y = (e.clientY - rect.top - state.transform.y) / state.transform.scale;
+
+                if (state.currentTool === 'path') {
+                    state.pathPoints.push({x, y});
+                    updatePath();
+                } else if (state.currentTool === 'rect') {
+                    const width = x - state.startX;
+                    const height = y - state.startY;
+
+                    state.currentElement.setAttribute('x', width > 0 ? state.startX : x);
+                    state.currentElement.setAttribute('y', height > 0 ? state.startY : y);
+                    state.currentElement.setAttribute('width', Math.abs(width));
+                    state.currentElement.setAttribute('height', Math.abs(height));
+                } else if (state.currentTool === 'circle') {
+                    const dx = x - state.startX;
+                    const dy = y - state.startY;
+                    const radius = Math.sqrt(dx * dx + dy * dy);
+                    state.currentElement.setAttribute('r', radius);
+                } else if (state.currentTool === 'line') {
+                    state.currentElement.setAttribute('x2', x);
+                    state.currentElement.setAttribute('y2', y);
+                }
+            }
+
+            function endDrawing() {
+                if (isPanning) {
+                    endPanning();
+                    return;
+                }
+
+                if (state.isMoving) {
+                    endMovingElement();
+                    return;
+                }
+
+                if (!state.isDrawing) return;
+
+                state.isDrawing = false;
+
+                if (state.currentElement) {
+                    // 检查元素是否有实际大小，如果没有则移除
+                    if (state.currentTool === 'rect') {
+                        const width = parseFloat(state.currentElement.getAttribute('width'));
+                        const height = parseFloat(state.currentElement.getAttribute('height'));
+                        if (width === 0 || height === 0) {
+                            svgCanvas.removeChild(state.currentElement);
+                        }
+                    } else if (state.currentTool === 'circle') {
+                        const radius = parseFloat(state.currentElement.getAttribute('r'));
+                        if (radius === 0) {
+                            svgCanvas.removeChild(state.currentElement);
+                        }
+                    } else if (state.currentTool === 'line') {
+                        const x1 = parseFloat(state.currentElement.getAttribute('x1'));
+                        const y1 = parseFloat(state.currentElement.getAttribute('y1'));
+                        const x2 = parseFloat(state.currentElement.getAttribute('x2'));
+                        const y2 = parseFloat(state.currentElement.getAttribute('y2'));
+                        if (x1 === x2 && y1 === y2) {
+                            svgCanvas.removeChild(state.currentElement);
+                        }
+                    } else if (state.currentTool === 'path') {
+                        if (state.pathPoints.length < 2) {
+                            svgCanvas.removeChild(state.currentElement);
+                        }
+                    }
+
+                    // 保存历史状态
+                    if (svgCanvas.contains(state.currentElement)) {
+                        saveToHistory();
+                    }
+                }
+
+                state.currentElement = null;
+
+                //2025-04-12
+                state.currentTool = 'select';
+                updateActiveTool();
+                clearSelection();
+                saveToLocalStorage();     //2025-04-13 保存到本地存储
+
+            }
+
+            // 更新路径
+            function updatePath() {
+                if (state.pathPoints.length === 0) return;
+
+                let pathData = `M ${state.pathPoints[0].x} ${state.pathPoints[0].y}`;
+
+                for (let i = 1; i < state.pathPoints.length; i++) {
+                    pathData += ` L ${state.pathPoints[i].x} ${state.pathPoints[i].y}`;
+                }
+
+                state.currentElement.setAttribute('d', pathData);
+            }
+
+            // 触摸事件处理
+            function handleTouchStart(e) {
+                if (e.touches.length === 1) {
+                    const touch = e.touches[0];
+                    const mouseEvent = new MouseEvent('mousedown', {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY
+                    });
+                    startDrawing(mouseEvent);
+                    e.preventDefault();
+                }
+            }
+
+            function handleTouchMove(e) {
+                if (e.touches.length === 1) {
+                    const touch = e.touches[0];
+                    const mouseEvent = new MouseEvent('mousemove', {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY
+                    });
+                    moveDrawing(mouseEvent);
+                    e.preventDefault();
+                }
+            }
+
+            function handleTouchEnd(e) {
+                const mouseEvent = new MouseEvent('mouseup');
+                endDrawing(mouseEvent);
+            }
+
+            // 初始化时创建默认图层
+            initLayers();
+
+            // 初始化
+            initCanvas();
+
+            // 窗口大小改变时调整画布
+            window.addEventListener('resize', function() {
+                updateCanvasTransform();
+            });
+
+            // 滚轮缩放
+            svgCanvas.addEventListener('wheel', handleZoom);
+
+            // 点击画布外部时清除选择
+            document.addEventListener('click', function(e) {
+                if (!canvasContainer.contains(e.target) && e.target !== propertiesPanel) {
+                    clearSelection();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
