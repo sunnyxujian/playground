@@ -153,19 +153,36 @@
               newH = Math.max(1, newH);
 
               if (target.maxRadius) {
+                // 跑道圆逻辑
                 let radius = newH / 2;
+
+                // 宽高约束：宽度不能小于 2 * 半径，且高度最小 5
                 newH = Math.max(newH, 5);
                 radius = newH / 2;
                 newW = Math.max(newW, radius * 2);
+
                 target.radius = [
                   [radius, radius],
                   [radius, radius],
                   [radius, radius],
                   [radius, radius],
                 ];
+              } else if (target.radius) {
+                // 普通圆角矩形逻辑
+                const maxRx = Math.max(...target.radius.map((r) => r[0]));
+                const maxRy = Math.max(...target.radius.map((r) => r[1]));
+
+                newW = Math.max(newW, maxRx * 2);
+                newH = Math.max(newH, maxRy * 2);
               }
 
-              target.set({ width: newW, height: newH, scaleX: 1, scaleY: 1 });
+              target.set({
+                width: newW,
+                height: newH,
+                scaleX: 1,
+                scaleY: 1,
+              });
+
               target.setCoords();
               canvas.requestRenderAll();
               return true;
@@ -187,7 +204,21 @@
               );
 
               let newW = local.x + target.width / 2;
-              newW = Math.max(1, newW);
+
+              // 根据圆角计算最小宽度
+              let minWidth = 1;
+              if (target.maxRadius) {
+                // 跑道圆模式：最小宽度是高度的2倍
+                minWidth = target.height;
+              } else if (target.radius) {
+                // 普通圆角矩形：最小宽度是左上+右上和左下+右下圆角X值的较大者
+                const [tl, tr, br, bl] = target.radius;
+                const topSum = tl[0] + tr[0]; // 左上 + 右上
+                const bottomSum = bl[0] + br[0]; // 左下 + 右下
+                minWidth = Math.max(topSum, bottomSum);
+              }
+
+              newW = Math.max(minWidth, newW);
               target.set({ width: newW, scaleX: 1 });
               target.setCoords();
               canvas.requestRenderAll();
@@ -210,7 +241,21 @@
               );
 
               let newW = target.width / 2 - local.x;
-              newW = Math.max(1, newW);
+
+              // 根据圆角计算最小宽度
+              let minWidth = 1;
+              if (target.maxRadius) {
+                // 跑道圆模式：最小宽度是高度的2倍
+                minWidth = target.height;
+              } else if (target.radius) {
+                // 普通圆角矩形：最小宽度是左上+右上和左下+右下圆角X值的较大者
+                const [tl, tr, br, bl] = target.radius;
+                const topSum = tl[0] + tr[0]; // 左上 + 右上
+                const bottomSum = bl[0] + br[0]; // 左下 + 右下
+                minWidth = Math.max(topSum, bottomSum);
+              }
+
+              newW = Math.max(minWidth, newW);
 
               const deltaW = newW - target.width;
               target.set({
@@ -240,7 +285,21 @@
               );
 
               let newH = target.height / 2 - local.y;
-              newH = Math.max(1, newH);
+
+              // 根据圆角计算最小高度
+              let minHeight = 1;
+              if (target.maxRadius) {
+                // 跑道圆模式：最小高度是5
+                minHeight = 5;
+              } else if (target.radius) {
+                // 普通圆角矩形：最小高度是左上+左下和右上+右下圆角Y值的较大者
+                const [tl, tr, br, bl] = target.radius;
+                const leftSum = tl[1] + bl[1]; // 左上 + 左下
+                const rightSum = tr[1] + br[1]; // 右上 + 右下
+                minHeight = Math.max(leftSum, rightSum);
+              }
+
+              newH = Math.max(minHeight, newH);
 
               const deltaH = newH - target.height;
               target.set({
@@ -270,7 +329,21 @@
               );
 
               let newH = local.y + target.height / 2;
-              newH = Math.max(1, newH);
+
+              // 根据圆角计算最小高度
+              let minHeight = 1;
+              if (target.maxRadius) {
+                // 跑道圆模式：最小高度是5
+                minHeight = 5;
+              } else if (target.radius) {
+                // 普通圆角矩形：最小高度是左上+左下和右上+右下圆角Y值的较大者
+                const [tl, tr, br, bl] = target.radius;
+                const leftSum = tl[1] + bl[1]; // 左上 + 左下
+                const rightSum = tr[1] + br[1]; // 右上 + 右下
+                minHeight = Math.max(leftSum, rightSum);
+              }
+
+              newH = Math.max(minHeight, newH);
               target.set({ height: newH, scaleY: 1 });
               target.setCoords();
               canvas.requestRenderAll();
