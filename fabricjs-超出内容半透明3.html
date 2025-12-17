@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <title>clipPath 遮罩示例（支持曲线 Path）</title>
+    <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 12px;
+      }
+      canvas {
+        border: 1px solid #ddd;
+        display: block;
+        margin-bottom: 8px;
+      }
+      .controls {
+        margin-bottom: 8px;
+      }
+      button {
+        margin-right: 6px;
+      }
+      label {
+        margin-right: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="controls">
+      <button id="rect">矩形遮罩</button>
+      <button id="rrect">圆角矩形遮罩</button>
+      <button id="circle">圆形遮罩</button>
+      <button id="curve">曲线路径遮罩（贝塞尔）</button>
+      <label
+        ><input id="showMaskVis" type="checkbox" checked />
+        显示遮罩（调试用）</label
+      >
+    </div>
+
+    <canvas id="c" width="1000" height="600"></canvas>
+
+    <script>
+      const canvas = new fabric.Canvas("c", { preserveObjectStacking: true });
+
+      // 一张背景图片（作为被遮罩的内容）
+      let imgObj = null;
+      fabric.Image.fromURL("https://fabricjs.com/assets/pug.jpg", (img) => {
+        img.set({
+          left: 120,
+          top: 60,
+          scaleX: 0.95,
+          scaleY: 0.95,
+        });
+        canvas.add(img);
+        imgObj = img;
+        canvas.setActiveObject(img);
+        canvas.requestRenderAll();
+      });
+
+      // 全画布的半透明覆盖层（我们会对它设置 clipPath）
+      const dimRect = new fabric.Rect({
+        left: 0,
+        top: 0,
+        width: canvas.width,
+        height: canvas.height,
+        fill: "rgba(0,0,0,0.45)",
+        selectable: false,
+        evented: false,
+      });
+      canvas.add(dimRect);
+      dimRect.moveTo(
+        canvas.getHeight
+          ? canvas.getObjects().length - 1
+          : canvas.getObjects().length - 1
+      );
+
+      // 当前遮罩对象（我们会把它添加到 canvas，并把 dimRect.clipPath 指向它）
+      let currentMask = null;
+
+      // 工具：把某个形状设为当前遮罩并绑定到 dimRect.clipPath
+      function useMask(mask) {
+        // 保证遮罩在 canvas 中（只添加一次）
+        if (!canvas.contains(mask)) {
+          canvas.add(mask);
+        }
+        // 显示/事件使能，便于拖拽/缩放/旋转
+        mask.selectable = true;
+        mask.evented = true;
+        mask.hasBorders = true;
+        mask.hasControls = true;
+
+        // clipPath 使用绝对定位，这样遮罩在 canvas 上移动会被正确识别
+        mask.absolutePositioned = true;
+
+        // 将 dimRect 的 clipPath 设置为该对象的引用
+        dimRect.clipPath = mask;
+        // inverted=true 表示“反向裁剪”: dimRect 显示在 mask 之外，mask 内部形成透孔。
+        dimRect.clipPath.inverted = true;
+        // 把 dimRect 放在最上层（盖在图片上）
+        dimRect.bringToFront();
+        // 把遮罩显示在 dimRect 之上（以便可编辑）。为了让遮罩可见，它需要在 dimRect 的上方
+        mask.bringToFront();
+
+        currentMask = mask;
+        canvas.requestRenderAll();
+      }
+
+      // 创建几种遮罩（Rect / 圆角矩形 / Circle / T / 曲线路径）
+      function createRectMask() {
+        return new fabric.Rect({
+          left: 300,
+          top: 120,
+          width: 400,
+          height: 300,
+          fill: "rgba(255,255,255,0.6)",
+          stroke: "#999",
+          strokeWidth: 1,
+          selectable: true,
+          evented: true,
+          originX: "left",
+          originY: "top",
+        });
+      }
+
+      function createRRectMask() {
+        // fabric.Rect 支持 rx/ry via 'rx' property (fabric 5.x)
+        return new fabric.Rect({
+          left: 320,
+          top: 140,
+          width: 360,
+          height: 280,
+          rx: 30,
+          ry: 30,
+          fill: "rgba(255,255,255,0.6)",
+          stroke: "#999",
+          strokeWidth: 1,
+          selectable: true,
+          evented: true,
+          originX: "left",
+          originY: "top",
+        });
+      }
+
+      function createCircleMask() {
+        return new fabric.Circle({
+          left: 380,
+          top: 140,
+          radius: 140,
+          fill: "rgba(255,255,255,0.6)",
+          stroke: "#999",
+          strokeWidth: 1,
+          selectable: true,
+          evented: true,
+          originX: "left",
+          originY: "top",
+        });
+      }
+
+      function createCurveMask() {
+        // 曲线示例：一个用贝塞尔曲线绘制的不规则闭合路径（看起来像一个水滴/叶子）
+        // M -> C -> C -> Z，保持曲线段存在以测试曲线裁剪
+        const curvePath =
+          "M 100 0 C 160 0 200 40 200 100 C 200 160 140 210 100 240 C 60 210 0 160 0 100 C 0 40 40 0 100 0 Z";
+        return new fabric.Path(curvePath, {
+          left: 360,
+          top: 120,
+          scaleX: 1,
+          scaleY: 1,
+          fill: "rgba(255,255,255,0.6)",
+          stroke: "#999",
+          strokeWidth: 1,
+          selectable: true,
+          evented: true,
+          originX: "left",
+          originY: "top",
+        });
+      }
+
+      // 初始使用 T 形
+      const tMask = createCurveMask();
+      useMask(tMask);
+
+      // 绑定按钮切换
+      document
+        .getElementById("rect")
+        .addEventListener("click", () => useMask(createRectMask()));
+      document
+        .getElementById("rrect")
+        .addEventListener("click", () => useMask(createRRectMask()));
+      document
+        .getElementById("circle")
+        .addEventListener("click", () => useMask(createCircleMask()));
+      document
+        .getElementById("curve")
+        .addEventListener("click", () => useMask(createCurveMask()));
+
+      // 切换遮罩是否可见（debug 时看形状边界）
+      document
+        .getElementById("showMaskVis")
+        .addEventListener("change", (ev) => {
+          const show = ev.target.checked;
+          console.log("🚀 ~ show=>", show);
+          if (currentMask) {
+            currentMask.set("opacity", show ? 1 : 0); // 隐藏填充/边界，仅保留孔洞效果
+            currentMask.set("selectable", show); // 如果隐藏也可以把它设为不可选
+          }
+          canvas.requestRenderAll();
+        });
+
+      // 小提示：移动/缩放/旋转遮罩会自动更新 dimRect 的穿孔效果（因为 clipPath.absolutePositioned = true 并且使用的是同一个对象引用）。
+      // 你也可以移动背景图像本身，遮罩仍然按 canvas 坐标建立“透孔”，效果一致。
+
+      // 在交互中保持 dimRect 覆盖在最上面（避免被遮罩对象遮盖）
+      canvas.on("object:modified", () => {
+        if (dimRect) dimRect.bringToFront();
+        if (currentMask) currentMask.bringToFront();
+        canvas.requestRenderAll();
+      });
+
+      canvas.on("object:moving", () => {
+        if (dimRect) dimRect.bringToFront();
+        if (currentMask) currentMask.bringToFront();
+      });
+
+      // 防止误选到 dimRect
+      dimRect.selectable = false;
+      dimRect.evented = false;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<!--
+  高级OCR识别页面 - 支持多种OCR引擎
+  推荐方案：
+  1. PaddleOCR.js - 中文识别率最高（需要下载模型文件）
+  2. 在线API - 百度OCR、腾讯OCR、阿里OCR（需要API密钥）
+  3. Tesseract.js - 当前使用的方案
+-->
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>高级OCR识别 - 多引擎支持</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "Microsoft YaHei", sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 20px;
+      }
+
+      .container {
+        max-width: 1000px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        padding: 40px;
+      }
+
+      h1 {
+        text-align: center;
+        color: #333;
+        margin-bottom: 30px;
+        font-size: 28px;
+      }
+
+      .engine-selector {
+        background: #f8f9ff;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        border-left: 4px solid #667eea;
+      }
+
+      .engine-selector h3 {
+        color: #333;
+        margin-bottom: 15px;
+        font-size: 18px;
+      }
+
+      .engine-options {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+      }
+
+      .engine-option {
+        padding: 15px;
+        border: 2px solid #ddd;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s;
+        background: white;
+      }
+
+      .engine-option:hover {
+        border-color: #667eea;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+      }
+
+      .engine-option.selected {
+        border-color: #667eea;
+        background: #f0f2ff;
+      }
+
+      .engine-option input[type="radio"] {
+        margin-right: 10px;
+      }
+
+      .engine-option strong {
+        display: block;
+        color: #333;
+        margin-bottom: 5px;
+      }
+
+      .engine-option .desc {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+      }
+
+      .engine-option .rating {
+        color: #ff9800;
+        font-size: 12px;
+        margin-top: 5px;
+      }
+
+      .api-config {
+        background: #fff3cd;
+        padding: 15px;
+        border-radius: 8px;
+        margin-top: 15px;
+        border-left: 4px solid #ff9800;
+        display: none;
+      }
+
+      .api-config.show {
+        display: block;
+      }
+
+      .api-config input {
+        width: 100%;
+        padding: 8px;
+        margin: 8px 0;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        font-size: 14px;
+      }
+
+      .upload-area {
+        border: 3px dashed #667eea;
+        border-radius: 12px;
+        padding: 40px;
+        text-align: center;
+        background: #f8f9ff;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        margin-bottom: 30px;
+      }
+
+      .upload-area:hover {
+        border-color: #764ba2;
+        background: #f0f2ff;
+      }
+
+      .upload-area.dragover {
+        border-color: #764ba2;
+        background: #e8ebff;
+        transform: scale(1.02);
+      }
+
+      #fileInput {
+        display: none;
+      }
+
+      .preview-image {
+        max-width: 100%;
+        max-height: 400px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        display: block;
+        margin: 20px auto;
+      }
+
+      .button-group {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 20px;
+      }
+
+      .button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 14px 32px;
+        border-radius: 8px;
+        font-size: 16px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-weight: 600;
+        flex: 1;
+      }
+
+      .button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+      }
+
+      .button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .button-clear {
+        background: #6c757d;
+        flex: 0 0 auto;
+        padding: 14px 24px;
+      }
+
+      .result-section {
+        background: #f8f9ff;
+        border-radius: 8px;
+        padding: 20px;
+        margin-top: 20px;
+      }
+
+      .result-text {
+        background: white;
+        padding: 15px;
+        border-radius: 6px;
+        border-left: 4px solid #667eea;
+        color: #333;
+        line-height: 1.6;
+        white-space: pre-wrap;
+        word-break: break-all;
+        min-height: 100px;
+      }
+
+      .info-box {
+        background: #e7f3ff;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        border-left: 4px solid #2196f3;
+        font-size: 14px;
+        color: #1976d2;
+      }
+
+      .info-box strong {
+        display: block;
+        margin-bottom: 8px;
+      }
+
+      .hidden {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🔍 高级OCR识别 - 多引擎支持</h1>
+
+      <div class="info-box">
+        <strong>💡 推荐方案（按中文识别率排序）：</strong>
+        <ul style="margin: 8px 0 0 20px;">
+          <li><strong>1. 在线API（推荐）</strong>：百度OCR、腾讯OCR、阿里OCR - 识别率最高（90%+），需要API密钥</li>
+          <li><strong>2. PaddleOCR.js</strong>：中文识别率很高（85%+），需要下载模型文件（约50MB）</li>
+          <li><strong>3. Tesseract.js</strong>：当前方案，识别率中等（60-70%）</li>
+        </ul>
+      </div>
+
+      <div class="engine-selector">
+        <h3>选择OCR引擎</h3>
+        <div class="engine-options">
+          <label class="engine-option" id="option-api">
+            <input type="radio" name="engine" value="api" />
+            <strong>🌐 在线API（推荐）</strong>
+            <div class="rating">⭐⭐⭐⭐⭐ 识别率最高</div>
+            <div class="desc">百度/腾讯/阿里OCR API</div>
+          </label>
+          <label class="engine-option" id="option-paddle">
+            <input type="radio" name="engine" value="paddle" />
+            <strong>🚀 PaddleOCR.js</strong>
+            <div class="rating">⭐⭐⭐⭐ 识别率很高</div>
+            <div class="desc">需要下载模型文件</div>
+          </label>
+          <label class="engine-option selected" id="option-tesseract">
+            <input type="radio" name="engine" value="tesseract" checked />
+            <strong>📚 Tesseract.js</strong>
+            <div class="rating">⭐⭐⭐ 识别率中等</div>
+            <div class="desc">当前使用的方案</div>
+          </label>
+        </div>
+
+        <div class="api-config" id="apiConfig">
+          <strong>API配置（选择在线API时需要）：</strong>
+          <select id="apiProvider" style="width: 100%; padding: 8px; margin: 8px 0; border: 1px solid #ddd; border-radius: 4px;">
+            <option value="baidu">百度OCR</option>
+            <option value="tencent">腾讯OCR</option>
+            <option value="aliyun">阿里云OCR</option>
+          </select>
+          <input type="text" id="apiKey" placeholder="API Key / AppID" />
+          <input type="text" id="apiSecret" placeholder="Secret Key / AppKey" />
+          <div style="font-size: 12px; color: #666; margin-top: 8px;">
+            💡 获取API密钥：
+            <a href="https://cloud.baidu.com/product/ocr" target="_blank">百度OCR</a> |
+            <a href="https://cloud.tencent.com/product/ocr" target="_blank">腾讯OCR</a> |
+            <a href="https://www.aliyun.com/product/ocr" target="_blank">阿里OCR</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="upload-area" id="uploadArea">
+        <div style="font-size: 48px; margin-bottom: 15px;">📁</div>
+        <div style="color: #666; font-size: 16px; margin-bottom: 10px;">
+          点击或拖拽图片到此处
+        </div>
+        <div style="color: #999; font-size: 14px;">
+          支持 JPG、PNG 等常见图片格式
+        </div>
+        <input type="file" id="fileInput" accept="image/*" />
+      </div>
+
+      <div class="hidden" id="previewSection">
+        <img id="previewImage" class="preview-image" alt="预览图片" />
+      </div>
+
+      <div class="button-group">
+        <button class="button" id="recognizeBtn" disabled>开始识别</button>
+        <button class="button button-clear" id="clearBtn">清除</button>
+      </div>
+
+      <div class="result-section hidden" id="resultSection">
+        <div style="font-size: 18px; font-weight: 600; color: #333; margin-bottom: 15px;">
+          识别结果
+        </div>
+        <div class="result-text" id="resultText"></div>
+        <button
+          class="button"
+          id="copyBtn"
+          style="margin-top: 15px; padding: 10px 20px; font-size: 14px;"
+        >
+          📋 复制识别结果
+        </button>
+      </div>
+    </div>
+
+    <script>
+      const uploadArea = document.getElementById("uploadArea");
+      const fileInput = document.getElementById("fileInput");
+      const previewSection = document.getElementById("previewSection");
+      const previewImage = document.getElementById("previewImage");
+      const recognizeBtn = document.getElementById("recognizeBtn");
+      const resultSection = document.getElementById("resultSection");
+      const resultText = document.getElementById("resultText");
+      const clearBtn = document.getElementById("clearBtn");
+      const copyBtn = document.getElementById("copyBtn");
+      const apiConfig = document.getElementById("apiConfig");
+      const apiProvider = document.getElementById("apiProvider");
+      const apiKeyInput = document.getElementById("apiKey");
+      const apiSecretInput = document.getElementById("apiSecret");
+
+      let currentImage = null;
+      let recognizedText = "";
+
+      // 引擎选择
+      const engineOptions = document.querySelectorAll('input[name="engine"]');
+      engineOptions.forEach((option) => {
+        option.addEventListener("change", (e) => {
+          const value = e.target.value;
+          document.querySelectorAll(".engine-option").forEach((el) => {
+            el.classList.remove("selected");
+          });
+          document.getElementById(`option-${value}`).classList.add("selected");
+
+          // 显示/隐藏API配置
+          if (value === "api") {
+            apiConfig.classList.add("show");
+          } else {
+            apiConfig.classList.remove("show");
+          }
+        });
+      });
+
+      // 文件上传
+      uploadArea.addEventListener("click", () => fileInput.click());
+      uploadArea.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        uploadArea.classList.add("dragover");
+      });
+      uploadArea.addEventListener("dragleave", () => {
+        uploadArea.classList.remove("dragover");
+      });
+      uploadArea.addEventListener("drop", (e) => {
+        e.preventDefault();
+        uploadArea.classList.remove("dragover");
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith("image/")) {
+          handleFile(file);
+        }
+      });
+
+      fileInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          handleFile(file);
+        }
+      });
+
+      function handleFile(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          currentImage = e.target.result;
+          previewImage.src = currentImage;
+          previewSection.classList.remove("hidden");
+          recognizeBtn.disabled = false;
+          resultSection.classList.add("hidden");
+        };
+        reader.readAsDataURL(file);
+      }
+
+      // 识别功能
+      recognizeBtn.addEventListener("click", async () => {
+        if (!currentImage) return;
+
+        const selectedEngine = document.querySelector('input[name="engine"]:checked').value;
+        recognizeBtn.disabled = true;
+        resultSection.classList.add("hidden");
+        resultText.textContent = "识别中...";
+
+        try {
+          let text = "";
+
+          if (selectedEngine === "api") {
+            text = await recognizeWithAPI(currentImage);
+          } else if (selectedEngine === "paddle") {
+            text = await recognizeWithPaddleOCR(currentImage);
+          } else {
+            text = await recognizeWithTesseract(currentImage);
+          }
+
+          recognizedText = text || "(未识别到文字)";
+          resultText.textContent = recognizedText;
+          resultSection.classList.remove("hidden");
+        } catch (error) {
+          resultText.textContent = `识别失败: ${error.message}\n\n建议：\n1. 检查图片是否清晰\n2. 尝试切换OCR引擎\n3. 如果使用API，检查密钥是否正确`;
+          resultSection.classList.remove("hidden");
+        } finally {
+          recognizeBtn.disabled = false;
+        }
+      });
+
+      // Tesseract.js识别
+      async function recognizeWithTesseract(imageSrc) {
+        // 动态加载Tesseract
+        if (typeof Tesseract === "undefined") {
+          const script = document.createElement("script");
+          script.src = "js/tesseract/tesseract.min.js";
+          document.head.appendChild(script);
+          await new Promise((resolve) => {
+            script.onload = resolve;
+          });
+        }
+
+        const worker = await Tesseract.createWorker("chi_sim", 1);
+        const {
+          data: { text },
+        } = await worker.recognize(imageSrc);
+        await worker.terminate();
+        return text;
+      }
+
+      // PaddleOCR.js识别（需要先下载模型）
+      async function recognizeWithPaddleOCR(imageSrc) {
+        throw new Error(
+          "PaddleOCR.js需要下载模型文件。\n\n安装步骤：\n1. 访问 https://github.com/PaddlePaddle/PaddleOCR\n2. 下载PaddleOCR.js和模型文件\n3. 将文件放入项目目录\n\n或者使用在线API获得更好的识别效果。"
+        );
+      }
+
+      // 在线API识别
+      async function recognizeWithAPI(imageSrc) {
+        const provider = apiProvider.value;
+        const key = apiKeyInput.value;
+        const secret = apiSecretInput.value;
+
+        if (!key || !secret) {
+          throw new Error("请先配置API密钥");
+        }
+
+        // 将base64转换为blob
+        const base64Data = imageSrc.split(",")[1];
+        const blob = await fetch(`data:image/png;base64,${base64Data}`).then((r) =>
+          r.blob()
+        );
+
+        if (provider === "baidu") {
+          return await recognizeWithBaiduOCR(blob, key, secret);
+        } else if (provider === "tencent") {
+          return await recognizeWithTencentOCR(blob, key, secret);
+        } else {
+          return await recognizeWithAliyunOCR(blob, key, secret);
+        }
+      }
+
+      // 百度OCR API
+      async function recognizeWithBaiduOCR(imageBlob, apiKey, secretKey) {
+        // 获取access_token
+        const tokenResponse = await fetch(
+          `https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=${apiKey}&client_secret=${secretKey}`,
+          { method: "POST" }
+        );
+        const tokenData = await tokenResponse.json();
+        const accessToken = tokenData.access_token;
+
+        if (!accessToken) {
+          throw new Error("获取access_token失败，请检查API密钥");
+        }
+
+        // 调用OCR API
+        const formData = new FormData();
+        formData.append("image", imageBlob);
+
+        const ocrResponse = await fetch(
+          `https://aip.baidubce.com/rest/2.0/ocr/v1/general_basic?access_token=${accessToken}`,
+          {
+            method: "POST",
+            body: formData,
+          }
+        );
+
+        const ocrData = await ocrResponse.json();
+        if (ocrData.error_code) {
+          throw new Error(`百度OCR错误: ${ocrData.error_msg}`);
+        }
+
+        return ocrData.words_result
+          .map((item) => item.words)
+          .join("\n");
+      }
+
+      // 腾讯OCR API（简化版，实际需要更多参数）
+      async function recognizeWithTencentOCR(imageBlob, secretId, secretKey) {
+        throw new Error(
+          "腾讯OCR需要服务器端支持（CORS限制）。\n\n建议：\n1. 使用百度OCR（支持浏览器直接调用）\n2. 或搭建自己的API代理服务器"
+        );
+      }
+
+      // 阿里云OCR API（简化版）
+      async function recognizeWithAliyunOCR(imageBlob, accessKeyId, accessKeySecret) {
+        throw new Error(
+          "阿里云OCR需要服务器端支持（CORS限制）。\n\n建议：\n1. 使用百度OCR（支持浏览器直接调用）\n2. 或搭建自己的API代理服务器"
+        );
+      }
+
+      // 清除功能
+      clearBtn.addEventListener("click", () => {
+        currentImage = null;
+        recognizedText = "";
+        previewImage.src = "";
+        previewSection.classList.add("hidden");
+        resultSection.classList.add("hidden");
+        recognizeBtn.disabled = true;
+        fileInput.value = "";
+      });
+
+      // 复制功能
+      copyBtn.addEventListener("click", async () => {
+        if (!recognizedText) return;
+        try {
+          await navigator.clipboard.writeText(recognizedText);
+          copyBtn.textContent = "✅ 已复制！";
+          setTimeout(() => {
+            copyBtn.textContent = "📋 复制识别结果";
+          }, 2000);
+        } catch (err) {
+          const textArea = document.createElement("textarea");
+          textArea.value = recognizedText;
+          textArea.style.position = "fixed";
+          textArea.style.opacity = "0";
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textArea);
+          copyBtn.textContent = "✅ 已复制！";
+          setTimeout(() => {
+            copyBtn.textContent = "📋 复制识别结果";
+          }, 2000);
+        }
+      });
+    </script>
+  </body>
+</html>

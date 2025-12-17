@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <title>clipPath 遮罩示例（支持曲线 Path）</title>
+    <script src="https://cdn.jsdelivr.net/npm/fabric@5.3.0/dist/fabric.min.js"></script>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 12px;
+      }
+      canvas {
+        border: 1px solid #ddd;
+        display: block;
+        margin-bottom: 8px;
+      }
+      .controls {
+        margin-bottom: 8px;
+      }
+      button {
+        margin-right: 6px;
+      }
+      label {
+        margin-right: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="c" width="1000" height="600"></canvas>
+
+    <script>
+      const canvas = new fabric.Canvas("c", { preserveObjectStacking: true });
+
+      // 一张背景图片（作为被遮罩的内容） https://fabricjs.com/assets/pug.jpg
+
+      // 全画布的半透明覆盖层（我们会对它设置 clipPath）
+      const rect = new fabric.Rect({
+        left: 100,
+        top: 100,
+        width: 400,
+        height: 400,
+        rx: 10,
+      });
+      canvas.add(rect);
+
+      setBackgroundWithCenterTransform(
+        rect,
+        "https://fabricjs.com/assets/pug.jpg",
+        {
+          left: 0,
+          top: 0,
+          scale: 0.8,
+          rotate: 0,
+          repeat: "no-repeat",
+        }
+      );
+
+      function setBackgroundWithCenterTransform(target, url, opts = {}) {
+        const img = new Image();
+        img.src = url;
+        const {
+          left = 0,
+          top = 0,
+          scale = 1,
+          rotate = 0, // degrees
+          repeat = "no-repeat",
+        } = opts;
+
+        function apply() {
+          const objW = target.getScaledWidth();
+          const objH = target.getScaledHeight();
+          const imgW = img.width;
+          const imgH = img.height;
+
+          if (!imgW || !imgH) return;
+
+          // 基础 transform（旋转 + 缩放）
+          const rad = (rotate * Math.PI) / 180;
+          const s = scale;
+          const a = Math.cos(rad) * s;
+          const b = Math.sin(rad) * s;
+          const c = -Math.sin(rad) * s;
+          const d = Math.cos(rad) * s;
+
+          // —— 图片中心点（旋转与缩放的中心） ——
+          const cx = imgW / 2;
+          const cy = imgH / 2;
+
+          // —— 计算平移，使图片中心点落在 (left + cx, top + cy) ——
+          // 期望的中心点 = left + cx, top + cy
+          const desiredX = left + cx;
+          const desiredY = top + cy;
+
+          // 解矩阵的 e,f，使旋转+缩放后的中心仍然在 desiredX/Y
+          const e = desiredX - (a * cx + c * cy);
+          const f = desiredY - (b * cx + d * cy);
+
+          const pattern = new fabric.Pattern({
+            source: img,
+            repeat,
+            patternTransform: [a, b, c, d, e, f],
+          });
+
+          target.set("fill", pattern);
+          target.canvas && target.canvas.requestRenderAll();
+        }
+
+        // 如果图片未加载好，等 load 再执行
+        if (!img.complete || img.width === 0 || img.height === 0) {
+          img.onload = apply;
+        } else {
+          apply();
+        }
+      }
+    </script>
+  </body>
+</html>
